@@ -177,34 +177,42 @@ def _step_build():
             session_dir.mkdir(parents=True, exist_ok=True)
 
             with st.status("Generating session plan + assessment + deck...", expanded=True) as s:
-                s.write("Session plan...")
-                plan = run_plan(edited_md, enriched, inputs)
-                state.update("session_plan", plan)
-                s.write("Assessment (3 frequency questions + commitments)...")
                 try:
-                    assessment = generate_program_assessment(enriched, inputs)
+                    s.write("Session plan...")
+                    plan = run_plan(edited_md, enriched, inputs)
+                    state.update("session_plan", plan)
+                    s.write("Assessment (3 frequency questions + commitments)...")
+                    try:
+                        assessment = generate_program_assessment(enriched, inputs)
+                    except Exception as e:
+                        st.warning(f"Live assessment generation failed ({e}); using offline template.")
+                        from growme.assessment.generator import generate_program_assessment_offline
+                        assessment = generate_program_assessment_offline(inputs.selected_behavior_ids)
+                    state.update("program_assessment", assessment)
+                    s.write("Slide bodies + facilitator guide...")
+                    slide_bodies = gen_slide_bodies(plan, enriched)
+                    guide_md = gen_facilitator_guide(plan, enriched)
+                    s.write("Composing deck + exporting .pptx...")
+                    base_url = os.environ.get("STREAMLIT_LOCAL_URL", "http://localhost:8501")
+                    pre_qr_url = f"{base_url}/?assessment={session_uuid}&kind=pre"
+                    post_qr_url = f"{base_url}/?assessment={session_uuid}&kind=post"
+                    d = build_deck(
+                        plan=plan, enriched=enriched, assessment=assessment,
+                        pre_qr_url=pre_qr_url, post_qr_url=post_qr_url,
+                        slide_bodies=slide_bodies, facilitator_guide_md=guide_md,
+                        company_alias=inputs.company_alias,
+                    )
+                    pptx_path = session_dir / "deck.pptx"
+                    export_pptx(d, pptx_path)
+                    state.update("deck", d)
+                    s.update(label="Done.", state="complete")
                 except Exception as e:
-                    st.warning(f"Live assessment generation failed ({e}); using offline template.")
-                    from growme.assessment.generator import generate_program_assessment_offline
-                    assessment = generate_program_assessment_offline(inputs.selected_behavior_ids)
-                state.update("program_assessment", assessment)
-                s.write("Slide bodies + facilitator guide...")
-                slide_bodies = gen_slide_bodies(plan, enriched)
-                guide_md = gen_facilitator_guide(plan, enriched)
-                s.write("Composing deck + exporting .pptx...")
-                base_url = os.environ.get("STREAMLIT_LOCAL_URL", "http://localhost:8501")
-                pre_qr_url = f"{base_url}/?assessment={session_uuid}&kind=pre"
-                post_qr_url = f"{base_url}/?assessment={session_uuid}&kind=post"
-                d = build_deck(
-                    plan=plan, enriched=enriched, assessment=assessment,
-                    pre_qr_url=pre_qr_url, post_qr_url=post_qr_url,
-                    slide_bodies=slide_bodies, facilitator_guide_md=guide_md,
-                    company_alias=inputs.company_alias,
-                )
-                pptx_path = session_dir / "deck.pptx"
-                export_pptx(d, pptx_path)
-                state.update("deck", d)
-                s.update(label="Done.", state="complete")
+                    s.update(label=f"Build failed: {e}", state="error")
+                    st.error(
+                        "Build failed mid-pipeline. Click 🚀 Build again to retry, "
+                        "or ← Back to Step 3 if the design doc needs changes."
+                    )
+                    return
             st.rerun()
         return
 
