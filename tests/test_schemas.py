@@ -3,22 +3,16 @@ import pytest
 from pydantic import ValidationError
 
 from growme.schemas import (
-    WizardInputs,
-    BehaviorTemplate,
-    ResearchQuestions,
-    CitedFact,
-    BehaviorFindings,
-    BehaviorContext,
-    BaseCompanyResearch,
-    EnrichedContext,
-    DesignDoc,
     AgendaBlock,
+    AssessmentResponse,
+    BehaviorFindings,
+    CitedFact,
+    FrequencyQuestion,
+    ProgramAssessment,
+    SessionDeck,
     SessionPlan,
-    SessionMaterials,
-    LearnerResponse,
-    Nudge,
-    BehaviorMovement,
-    DeltaReport,
+    Slide,
+    WizardInputs,
 )
 
 
@@ -29,7 +23,7 @@ def test_wizard_inputs_requires_three_behaviors():
         audience_description="12 mid-market AEs",
         selected_behavior_ids=["a", "b", "c"],
     )
-    assert inputs.program_length_sessions == 4
+    assert inputs.program_length_sessions == 1
     assert inputs.session_duration_min == 60
 
 
@@ -61,7 +55,7 @@ def test_behavior_findings_caps_examples():
 
 def test_session_plan_integration_session_allows_no_behavior_id():
     plan = SessionPlan(
-        session_number=4,
+        session_number=1,
         title="Integration",
         behavior_id=None,
         learning_objective="Combine all three behaviors in a deal motion",
@@ -70,3 +64,79 @@ def test_session_plan_integration_session_allows_no_behavior_id():
         ],
     )
     assert plan.behavior_id is None
+
+
+def test_slide_poll_qr_carries_qr_url():
+    s = Slide(
+        title="Pre-assessment",
+        body_md="Scan the code below.",
+        kind="poll_qr",
+        qr_url="http://localhost:8501/?assessment=abc&kind=pre",
+        qr_caption="Scan to take pre-assessment",
+    )
+    assert s.kind == "poll_qr"
+    assert s.qr_url == "http://localhost:8501/?assessment=abc&kind=pre"
+
+
+def test_session_deck_roundtrip():
+    deck = SessionDeck(
+        title="Photon DB — Behavior Change",
+        behavior_ids=["a", "b", "c"],
+        slides=[Slide(title="t", body_md="b", kind="title")],
+        facilitator_guide_md="# Guide",
+        pre_qr_url="http://localhost:8501/?assessment=u&kind=pre",
+        post_qr_url="http://localhost:8501/?assessment=u&kind=post",
+    )
+    reloaded = SessionDeck.model_validate_json(deck.model_dump_json())
+    assert reloaded == deck
+
+
+def test_program_assessment_requires_three_questions():
+    with pytest.raises(ValidationError):
+        ProgramAssessment(
+            pre_questions=[
+                FrequencyQuestion(behavior_id="a", prompt="x"),
+                FrequencyQuestion(behavior_id="b", prompt="y"),
+            ],
+            commitment_options=["c1", "c2", "c3", "c4"],
+        )
+
+
+def test_program_assessment_caps_commitment_options_at_five():
+    with pytest.raises(ValidationError):
+        ProgramAssessment(
+            pre_questions=[
+                FrequencyQuestion(behavior_id="a", prompt="x"),
+                FrequencyQuestion(behavior_id="b", prompt="y"),
+                FrequencyQuestion(behavior_id="c", prompt="z"),
+            ],
+            commitment_options=["c1", "c2", "c3", "c4", "c5", "c6"],
+        )
+
+
+def test_frequency_question_default_options():
+    q = FrequencyQuestion(behavior_id="a", prompt="How often?")
+    assert q.options == ["Never", "Rarely", "Sometimes", "Often", "Always"]
+
+
+def test_assessment_response_pre_has_no_commitment():
+    r = AssessmentResponse(
+        session_uuid="abc",
+        learner_id="L1",
+        learner_name="Sam",
+        kind="pre",
+        frequency_answers={"a": "Rarely"},
+    )
+    assert r.commitment is None
+
+
+def test_assessment_response_post_carries_commitment():
+    r = AssessmentResponse(
+        session_uuid="abc",
+        learner_id="L1",
+        learner_name="Sam",
+        kind="post",
+        frequency_answers={"a": "Often"},
+        commitment="Try this on 3 calls this week",
+    )
+    assert r.commitment == "Try this on 3 calls this week"
