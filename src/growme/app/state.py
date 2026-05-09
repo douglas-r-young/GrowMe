@@ -47,3 +47,8 @@ def update(key: str, value: Any) -> None:
 
 def get(key: str, default: Any = None) -> Any:
     return load().get(key, default)
+
+
+def set_session_uuid(uid: str) -> None:
+    """Used by the assessment page to point at a wizard's session pickle."""
+    st.session_state["session_uuid"] = uid

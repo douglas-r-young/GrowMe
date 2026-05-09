@@ -17,6 +17,18 @@ PAGES = {
 
 
 def main():
+    qp = st.query_params
+    target = qp.get("assessment")
+    if isinstance(target, list):
+        target = target[0] if target else None
+    kind = qp.get("kind")
+    if isinstance(kind, list):
+        kind = kind[0] if kind else None
+    if target:
+        from growme.app.pages import assessment
+        assessment.render(target_uuid=target, kind=kind or "pre")
+        return
+
     st.sidebar.title("GrowMe 🌱")
     page = st.sidebar.radio("Navigate", list(PAGES.keys()))
     if page == "Wizard":
