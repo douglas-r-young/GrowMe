@@ -11,7 +11,7 @@ class WizardInputs(BaseModel):
     company_alias: str
     audience_description: str
     selected_behavior_ids: list[str]
-    program_length_sessions: int = 4
+    program_length_sessions: int = 1  # V0 demo: single session covering all 3 behaviors
     session_duration_min: int = 60
 
     @field_validator("selected_behavior_ids")
@@ -86,7 +86,7 @@ class DesignDoc(BaseModel):
     full_markdown: str
 
 
-# === SESSIONS + MATERIALS ===
+# === SESSION PLAN + AGENDA ===
 
 class AgendaBlock(BaseModel):
     name: str
@@ -97,39 +97,68 @@ class AgendaBlock(BaseModel):
 class SessionPlan(BaseModel):
     session_number: int
     title: str
-    behavior_id: str | None
+    behavior_id: str | None  # None = integration / multi-behavior session
     learning_objective: str
     agenda: list[AgendaBlock]
 
 
-class SessionMaterials(BaseModel):
-    session_number: int
-    miro_frame_id: str
-    slide_frame_ids: list[str]
-    pre_poll_id: str
-    post_poll_id: str
-    facilitator_guide_doc_id: str
+# === DECK (Streamlit-native materials) ===
+
+SlideKind = Literal["title", "content", "poll_qr", "close"]
 
 
-# === SIMULATED RUNTIME ===
+class Slide(BaseModel):
+    title: str
+    body_md: str
+    kind: SlideKind = "content"
+    qr_url: str | None = None        # only on kind="poll_qr"
+    qr_caption: str | None = None    # e.g. "Scan to take pre-assessment"
 
-class LearnerResponse(BaseModel):
+
+class SessionDeck(BaseModel):
+    session_number: int = 1
+    title: str
+    behavior_ids: list[str]                    # the three selected behaviors covered in this session
+    slides: list[Slide]
+    facilitator_guide_md: str
+    pptx_path: str | None = None               # set after export_pptx writes the file
+    pre_qr_url: str
+    post_qr_url: str
+
+
+# === ASSESSMENT (replaces per-session pre/post polls) ===
+
+class FrequencyQuestion(BaseModel):
+    behavior_id: str
+    prompt: str
+    options: list[str] = Field(
+        default_factory=lambda: ["Never", "Rarely", "Sometimes", "Often", "Always"]
+    )
+
+
+class ProgramAssessment(BaseModel):
+    pre_questions: list[FrequencyQuestion] = Field(min_length=3, max_length=3)
+    commitment_options: list[str] = Field(min_length=4, max_length=5)
+
+
+class AssessmentResponse(BaseModel):
+    session_uuid: str
     learner_id: str
     learner_name: str
-    session_number: int
-    pre_poll_answers: dict[str, str]
-    post_poll_commitment: str
-    nudge_replied: bool
+    kind: Literal["pre", "post"]
+    frequency_answers: dict[str, str]   # behavior_id -> choice (e.g. "Often")
+    commitment: str | None = None       # only on kind="post"
 
+
+# === NUDGES + DELTA ===
 
 class Nudge(BaseModel):
     learner_id: str
-    session_number: int
+    session_number: int = 1
     email_subject: str
     email_body_md: str
     slack_text: str
     proof_point_used: CitedFact
-    miro_card_id: str
 
 
 class BehaviorMovement(BaseModel):
@@ -144,22 +173,21 @@ class DeltaReport(BaseModel):
     top_objection_still_surfacing: CitedFact
     recommended_reinforcement_md: str
     full_markdown: str
-    miro_doc_id: str
 
 
 # === ORCHESTRATOR STATE ===
 
 class GrowMeState(TypedDict, total=False):
     wizard_inputs: WizardInputs
-    miro_board_id: str
 
     enriched_context: EnrichedContext | None
     design_doc: DesignDoc | None
     design_doc_edited_md: str | None
 
-    session_plans: list[SessionPlan] | None
-    materials: list[SessionMaterials] | None
+    session_plan: SessionPlan | None              # single session in V0
+    program_assessment: ProgramAssessment | None
+    deck: SessionDeck | None
 
-    learner_responses: list[LearnerResponse]
+    assessment_responses: list[AssessmentResponse]
     nudges: list[Nudge]
     delta_report: DeltaReport | None
