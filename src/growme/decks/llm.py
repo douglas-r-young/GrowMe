@@ -4,11 +4,11 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from growme.llm_clients import complete_json
-from growme.schemas import EnrichedContext, SessionPlan, WizardInputs
+from growme.schemas import EnrichedContext, SessionPlan
 
 
 class _SlideBody(BaseModel):
-    title: str
+    title: str = Field(min_length=1)
     body_md: str = Field(min_length=20)
 
 

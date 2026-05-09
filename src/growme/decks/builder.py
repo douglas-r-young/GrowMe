@@ -7,7 +7,6 @@ from growme.schemas import (
     SessionDeck,
     SessionPlan,
     Slide,
-    WizardInputs,
 )
 
 
@@ -30,6 +29,11 @@ def build_deck(
     """
     if len(slide_bodies) != 4:
         raise ValueError(f"slide_bodies must be length 4, got {len(slide_bodies)}")
+    if len(enriched.per_behavior) != 3:
+        raise ValueError(
+            f"enriched.per_behavior must be length 3, got {len(enriched.per_behavior)}"
+        )
+    _ = assessment  # currently used by the assessment page; kept here for symmetric Build args.
 
     title_text = plan.title or (f"{company_alias} · Behavior Change" if company_alias else "Behavior Change")
     pre_qr_caption = "Scan to take the pre-program assessment"
