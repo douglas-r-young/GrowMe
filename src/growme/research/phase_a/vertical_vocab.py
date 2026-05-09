@@ -2,14 +2,19 @@
 """Pull 10-15 domain vocabulary terms from a company's marketing content."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from growme.llm_clients import complete_json
 from growme.research.apify_clients import run_website_crawler
 
 
 class _Vocab(BaseModel):
-    terms: list[str] = Field(default_factory=list, min_length=10, max_length=15)
+    terms: list[str] = Field(default_factory=list, min_length=5)
+
+    @field_validator("terms")
+    @classmethod
+    def _cap(cls, v: list[str]) -> list[str]:
+        return v[:15]
 
 
 VOCAB_SYSTEM = (

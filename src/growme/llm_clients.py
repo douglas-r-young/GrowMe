@@ -11,18 +11,53 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+from contextlib import nullcontext
 
 import litellm
 from pydantic import BaseModel
 
+
+def _provider_limit(provider: str, default: int) -> threading.Semaphore:
+    env_key = f"{provider.upper()}_MAX_CONCURRENCY"
+    n = int(os.environ.get(env_key, default))
+    return threading.Semaphore(max(1, n))
+
+
+_PROVIDER_LIMITS: dict[str, threading.Semaphore] = {
+    "featherless_ai": _provider_limit("featherless_ai", 4),
+}
+
+# Pick the fastest available llama-70B-class provider for research + design_doc.
+# Cerebras > Groq > Featherless on raw inference speed; if a faster provider's
+# API key is set we use it, otherwise fall back so nothing breaks.
+def _fast_llama_model() -> str:
+    if os.environ.get("CEREBRAS_API_KEY"):
+        return "cerebras/llama-3.3-70b"
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq/llama-3.3-70b-versatile"
+    return "featherless_ai/meta-llama/Meta-Llama-3.1-70B-Instruct"
+
+
+def _fast_small_model() -> str:
+    if os.environ.get("CEREBRAS_API_KEY"):
+        return "cerebras/llama-3.3-70b"  # cost no object; same model
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq/llama-3.1-8b-instant"
+    return "featherless_ai/meta-llama/Meta-Llama-3.1-8B-Instruct"
+
+
+_FAST_LLAMA = _fast_llama_model()
+_FAST_SMALL = _fast_small_model()
+
 # Role -> model id (LiteLLM format: provider/model)
 ROLE_TO_MODEL: dict[str, str] = {
-    "research_extract": "featherless_ai/meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "research_synth":   "featherless_ai/meta-llama/Meta-Llama-3.1-70B-Instruct",
-    "design_doc":       "featherless_ai/meta-llama/Meta-Llama-3.1-70B-Instruct",
+    "research_extract": _FAST_SMALL,
+    "research_synth":   _FAST_LLAMA,
+    "design_doc":       _FAST_LLAMA,
     "session_plan":     "openai/gpt-4o",
     "materials":        "openai/gpt-4o",
-    "nudges":           "featherless_ai/meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "nudges":           _FAST_SMALL,
     "delta_report":     "openai/gpt-4o",
 }
 
@@ -41,16 +76,19 @@ def complete(
 ) -> str:
     """Single-shot completion. Returns the raw text content."""
     model = resolve_model_for_role(role)
-    resp = litellm.completion(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=temperature,
-        max_tokens=max_tokens,
-        api_key=_api_key_for(model),
-    )
+    provider = model.split("/", 1)[0]
+    gate = _PROVIDER_LIMITS.get(provider) or nullcontext()
+    with gate:
+        resp = litellm.completion(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_key=_api_key_for(model),
+        )
     return resp.choices[0].message.content or ""
 
 
@@ -103,4 +141,8 @@ def _api_key_for(model: str) -> str | None:
         return os.environ["OPENAI_API_KEY"]
     if model.startswith("featherless_ai/"):
         return os.environ["FEATHERLESS_API_KEY"]
+    if model.startswith("cerebras/"):
+        return os.environ["CEREBRAS_API_KEY"]
+    if model.startswith("groq/"):
+        return os.environ["GROQ_API_KEY"]
     return None

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from growme.behavior_menu import BEHAVIOR_MENU, render_questions_for_company
 from growme.llm_clients import complete_json
 from growme.research.citation import cited_fact, source_inference, source_web
-from growme.research.web_search import search
+from growme.research.web_search import WebHit, search_many
 from growme.schemas import BehaviorContext, BehaviorFindings, CitedFact
 
 Bucket = Literal["examples", "baselines", "objections", "proof_points"]
@@ -33,8 +33,7 @@ SYNTH_SYSTEM = (
 )
 
 
-def _run_one_question(question: str, bucket: Bucket) -> list[CitedFact]:
-    hits = search(question, max_results=5)
+def _synth_one_bucket(question: str, bucket: Bucket, hits: list[WebHit]) -> list[CitedFact]:
     blob = "\n".join(f"- [{h.title}]({h.url}): {h.content}" for h in hits) or "(no results)"
     parsed = complete_json(
         role="research_synth",
@@ -56,11 +55,14 @@ def run(behavior_id: str, company_alias: str) -> BehaviorContext:
     questions = render_questions_for_company(behavior_id, company_alias)
     buckets: list[Bucket] = ["examples", "baselines", "objections", "proof_points"]
 
+    # One Apify call covers all 4 bucket queries — collapses 4 cold-starts to 1.
+    hits_by_query = search_many(questions, max_results=5)
+
     findings: dict[Bucket, list[CitedFact]] = {b: [] for b in buckets}
 
     with ThreadPoolExecutor(max_workers=4) as ex:
         future_to_bucket = {
-            ex.submit(_run_one_question, q, b): b
+            ex.submit(_synth_one_bucket, q, b, hits_by_query.get(q, [])): b
             for q, b in zip(questions, buckets, strict=True)
         }
         for fut in as_completed(future_to_bucket):
