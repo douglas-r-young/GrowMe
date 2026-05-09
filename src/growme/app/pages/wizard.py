@@ -35,7 +35,7 @@ def render():
     elif step == 2:
         _step_generate_and_edit()
     elif step == 3:
-        st.warning("Step 4 not implemented yet — see Task 25.")
+        _step_build()
 
 
 def _step_company_audience():
@@ -107,7 +107,6 @@ def _step_behaviors():
 def _step_generate_and_edit():
     from growme.design_doc.node import run as run_design_doc
     from growme.research.node import run as run_research
-    from growme.schemas import WizardInputs
 
     st.subheader("Step 3 — Generate + Edit Design Doc")
 
@@ -115,12 +114,7 @@ def _step_generate_and_edit():
 
     if cached_doc is None:
         if st.button("🪄 Generate", type="primary"):
-            inputs = WizardInputs(
-                company_url=state.get("company_url"),
-                company_alias=state.get("company_alias"),
-                audience_description=state.get("audience_description"),
-                selected_behavior_ids=state.get("selected_behavior_ids"),
-            )
+            inputs = _wizard_inputs_from_state()
             with st.status("Researching...", expanded=True) as s:
                 s.write("Phase A: company snapshot, customer voice, vocab, competitors...")
                 s.write("Phase B: per-behavior research × 3 (parallel)...")
@@ -149,3 +143,98 @@ def _step_generate_and_edit():
     if col_build.button("🚀 Build", type="primary"):
         _go_to(3)
         st.rerun()
+
+
+def _step_build():
+    import os
+    from pathlib import Path
+
+    from growme.assessment.generator import generate_program_assessment
+    from growme.decks.builder import build_deck
+    from growme.decks.llm import gen_facilitator_guide, gen_slide_bodies
+    from growme.decks.pptx import export_pptx
+    from growme.decks.render import render_deck
+    from growme.sessions.plan_node import run as run_plan
+
+    st.subheader("Step 4 — Build")
+
+    deck = state.get("deck")
+
+    if deck is None:
+        if st.button("🚀 Build", type="primary"):
+            enriched = state.get("enriched_context")
+            edited_md = state.get("design_doc_edited_md")
+            inputs = _wizard_inputs_from_state()
+            session_uuid = state.session_uuid()
+            session_dir = Path(os.environ.get("GROWME_SESSION_DIR", ".growme_sessions")) / session_uuid
+            session_dir.mkdir(parents=True, exist_ok=True)
+
+            with st.status("Generating session plan + assessment + deck...", expanded=True) as s:
+                s.write("Session plan...")
+                plan = run_plan(edited_md, enriched, inputs)
+                state.update("session_plan", plan)
+                s.write("Assessment (3 frequency questions + commitments)...")
+                try:
+                    assessment = generate_program_assessment(enriched, inputs)
+                except Exception as e:
+                    st.warning(f"Live assessment generation failed ({e}); using offline template.")
+                    from growme.assessment.generator import generate_program_assessment_offline
+                    assessment = generate_program_assessment_offline(inputs.selected_behavior_ids)
+                state.update("program_assessment", assessment)
+                s.write("Slide bodies + facilitator guide (parallel)...")
+                slide_bodies = gen_slide_bodies(plan, enriched)
+                guide_md = gen_facilitator_guide(plan, enriched)
+                s.write("Composing deck + exporting .pptx...")
+                base_url = os.environ.get("STREAMLIT_LOCAL_URL", "http://localhost:8501")
+                pre_qr_url = f"{base_url}/?assessment={session_uuid}&kind=pre"
+                post_qr_url = f"{base_url}/?assessment={session_uuid}&kind=post"
+                d = build_deck(
+                    plan=plan, enriched=enriched, assessment=assessment,
+                    pre_qr_url=pre_qr_url, post_qr_url=post_qr_url,
+                    slide_bodies=slide_bodies, facilitator_guide_md=guide_md,
+                    company_alias=inputs.company_alias,
+                )
+                pptx_path = session_dir / "deck.pptx"
+                export_pptx(d, pptx_path)
+                state.update("deck", d)
+                s.update(label="Done.", state="complete")
+            st.rerun()
+        return
+
+    st.success("✅ Built!")
+
+    col_actions, col_qr = st.columns([2, 1])
+    with col_actions:
+        if deck.pptx_path:
+            st.download_button(
+                "⬇ Download .pptx",
+                data=Path(deck.pptx_path).read_bytes(),
+                file_name="growme_deck.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                type="primary",
+            )
+        st.download_button(
+            "⬇ Download facilitator guide (.md)",
+            data=deck.facilitator_guide_md,
+            file_name="facilitator_guide.md",
+            mime="text/markdown",
+        )
+        st.markdown("[▶ Open Demo Console](?nav=demo_console)")
+    with col_qr:
+        from growme.qr import generate_qr_png
+        st.image(generate_qr_png(deck.pre_qr_url), caption="Pre-poll QR")
+        st.image(generate_qr_png(deck.post_qr_url), caption="Post-poll QR")
+
+    st.divider()
+    st.subheader("Deck preview")
+    render_deck(deck)
+
+
+def _wizard_inputs_from_state():
+    from growme.schemas import WizardInputs
+    return WizardInputs(
+        company_url=state.get("company_url"),
+        company_alias=state.get("company_alias"),
+        audience_description=state.get("audience_description"),
+        selected_behavior_ids=state.get("selected_behavior_ids"),
+    )
