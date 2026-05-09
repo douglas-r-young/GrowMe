@@ -32,9 +32,14 @@ def render(target_uuid: str, kind: Literal["pre", "post"]):
     learner_name = st.text_input("Your name", value="")
     learner_id = st.text_input("Learner ID (or email)", value="")
 
-    answers: dict[str, str] = {}
+    # `pre_questions` is the schema name; we re-use the same 3 questions for
+    # the post form so deltas are computable. index=None forces a real choice
+    # rather than silently defaulting to "Never".
+    answers: dict[str, str | None] = {}
     for q in assessment.pre_questions:
-        answers[q.behavior_id] = st.radio(q.prompt, q.options, key=f"q_{q.behavior_id}_{kind}")
+        answers[q.behavior_id] = st.radio(
+            q.prompt, q.options, index=None, key=f"q_{q.behavior_id}_{kind}"
+        )
 
     commitment: str | None = None
     if kind == "post":
@@ -48,12 +53,15 @@ def render(target_uuid: str, kind: Literal["pre", "post"]):
         if not learner_name or not learner_id:
             st.error("Please fill in your name and learner ID first.")
             return
+        if any(v is None for v in answers.values()):
+            st.error("Please answer all 3 frequency questions before submitting.")
+            return
         resp = AssessmentResponse(
             session_uuid=target_uuid,
             learner_id=learner_id,
             learner_name=learner_name,
             kind=kind,
-            frequency_answers=answers,
+            frequency_answers=answers,  # type: ignore[arg-type]
             commitment=commitment,
         )
         existing = appstate.get("assessment_responses", []) or []
