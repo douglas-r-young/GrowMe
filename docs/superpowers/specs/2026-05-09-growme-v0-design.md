@@ -32,28 +32,32 @@ These three behaviors are pre-checked in the demo's behavior menu.
 ### 3.1 Top-level (boxes and arrows)
 
 ```
-┌────────────────────────────────────────┐    ┌──────────────────────────────┐
-│  STREAMLIT WEB APP                     │    │  MIRO BOARD                  │
-│  (Linda's home base)                   │    │  (System artifacts canvas)   │
-├────────────────────────────────────────┤    ├──────────────────────────────┤
-│  Wizard Step 1: Company + Audience     │    │  ⬛ Session 1 frame           │
-│  Wizard Step 2: Behavior menu (6→3)    │    │     • Slides (frames)        │
-│  Wizard Step 3: 🪄 Generation progress │ ──▶│     • Pre/post polls (table) │
-│                  → Design Doc preview  │    │     • Facilitator guide (doc)│
-│                  → 📝 Editable          │    │  ⬛ Session 2 frame           │
-│                  → [BUILD ON MIRO]     │    │  ⬛ Session 3 frame           │
-│  Wizard Step 4: Build progress + links │    │  ⬛ Session 4 frame           │
-│  Demo Console: Fast-forward simulation │ ──▶│  ⬛ Nudges frame              │
-│                                        │    │     • Per-learner email/chat │
-│                                        │    │  ⬛ Behavior delta report     │
-└────────────────────────────────────────┘    └──────────────────────────────┘
+┌──────────────────────────────────────┐   ┌────────────────────┐   ┌────────────────────────────┐
+│  STREAMLIT WEB APP                   │   │  CODEX CLI         │   │  MIRO BOARD                │
+│  (Linda's home base)                 │   │  + Miro MCP server │   │  (System artifacts canvas) │
+├──────────────────────────────────────┤   ├────────────────────┤   ├────────────────────────────┤
+│  Wizard Step 1: Company + Audience   │   │  Reads JSON plan   │   │  ⬛ Session 1 frame         │
+│  Wizard Step 2: Behavior menu (6→3)  │   │  Iterates items in │   │     • Slides (frames)      │
+│  Wizard Step 3: 🪄 Generation        │──▶│   declared order   │──▶│     • Pre/post polls       │
+│                  → Design Doc preview│   │  Calls mcp__miro__ │   │     • Facilitator guide    │
+│                  → 📝 Editable        │   │   tools per item   │   │  ⬛ Session 2 frame         │
+│                  → [BUILD ON MIRO]   │   │  Prints item ids + │   │  ⬛ Session 3 frame         │
+│  Wizard Step 4: Build progress       │   │   BUILD COMPLETE   │   │  ⬛ Session 4 frame         │
+│  Demo Console: Fast-forward          │──▶│                    │──▶│  ⬛ Nudges frame            │
+│                                      │   │                    │   │     • Per-learner email   │
+│                                      │   │                    │   │  ⬛ Behavior delta report   │
+└──────────────────────────────────────┘   └────────────────────┘   └────────────────────────────┘
+       │                                            ▲
+       └─ writes .growme_sessions/<uuid>/miro_plan_{materials,nudges,delta}.json
+                       └─ invokes `codex exec` (blocking subprocess; see §4.4)
+                          USE_LIVE_MIRO=false short-circuits to dry-run (plan only)
 ```
 
 ### 3.2 Three layers
 
 1. **Streamlit shell** — the only UI Linda sees. Multi-step wizard plus a Demo Console page for fast-forwarding simulated time.
 2. **LangGraph orchestrator** — six agentic nodes: research (Phase A + B) → design doc → session plan → materials → nudges → delta report.
-3. **Miro board** — the system of record for all visible artifacts except the design doc. Server-side via Miro REST API.
+3. **Miro board** — the system of record for all visible artifacts except the design doc. Materialized via a Codex CLI subprocess that drives a configured Miro MCP server (see §4.4). Python never holds a Miro REST token; the only Miro env var is `MIRO_BOARD_ID`, passed to Codex via the prompt.
 
 ### 3.3 Artifact split (where things live)
 
@@ -66,6 +70,7 @@ Editable text (design doc) lives where editing is easy: Streamlit `st.text_area`
 - No source-document upload (templated research questions cover the need; revisit in V1).
 - No real email/Slack send; nudges render as Miro cards. Optional Resend send if time permits.
 - No Linda edit on research output; no Linda edit on materials. Single edit point at the design doc.
+- No Python-side Miro REST client. All board writes are delegated to a `codex exec` subprocess that calls the configured Miro MCP server's tools.
 
 ---
 
@@ -128,7 +133,7 @@ START
   │
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 3. SESSION_PLAN  (LLM: Claude Sonnet 4.6 — heavy reasoning)      │
+│ 3. SESSION_PLAN  (LLM: OpenAI gpt-4o — heavy reasoning)          │
 │   For each of 4 sessions, generate Agenda:                       │
 │     Opening hook (5) → Teach (15) → Discuss (15) →               │
 │     Practice/role-play (15) → Commitment + close (10)            │
@@ -138,14 +143,16 @@ START
   │
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 4. MATERIALS  (4 sessions × 3 parallel branches each = 12 jobs) │
-│   Per session:                                                   │
-│     a) Slides → Miro frames (one frame = one slide)              │
+│ 4. MATERIALS  (LLM: OpenAI gpt-4o; 4 sessions × 3 parallel = 12)│
+│   Per session, in parallel:                                      │
+│     a) Slides → MiroFrame + MiroSlide plan fragments             │
 │        (slide content draws on .examples + .baselines)           │
-│     b) Pre-poll + Post-commitment poll → Miro polls + table      │
+│     b) Pre-poll + Post-commitment poll → MiroPoll fragments      │
 │        (poll questions templated against .baselines)             │
-│     c) Facilitator guide → Miro doc                              │
+│     c) Facilitator guide → MiroDoc fragment                      │
 │        (objection-handling section pulls .objections)            │
+│   Aggregator: Streamlit writes miro_plan_materials.json,         │
+│   dispatches codex_bridge.apply_plan(...) — see §4.4.            │
 └─────────────────────────────────────────────────────────────────┘
   │
   ▼ (Demo Console: fast-forward "session 1 complete", etc.)
@@ -153,21 +160,24 @@ START
   │
 ┌─────────────────────────────────────────────────────────────────┐
 │ 5. NUDGES  (LLM: Featherless cheap, high volume)                 │
-│   Reads commitment poll responses from Miro for each learner.    │
+│   Reads commitment poll responses from learner fixtures.         │
 │   Generates personalized email + Slack copy per learner,         │
 │   keyed to their commitment + relevant .proof_points.            │
-│   Side effect: writes nudge copy into Miro frames (visible       │
-│   for demo). Optional: Resend send if time permits.              │
+│   Output: MiroCard fragments (one per learner per session).      │
+│   Aggregator: Streamlit writes miro_plan_nudges.json,            │
+│   dispatches codex_bridge.apply_plan(...). Resend send optional. │
 └─────────────────────────────────────────────────────────────────┘
   │
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 6. DELTA_REPORT  (LLM: Claude — pattern reasoning)               │
+│ 6. DELTA_REPORT  (LLM: OpenAI gpt-4o — pattern reasoning)        │
 │   Reads all pre-poll + post-poll + nudge response data.          │
-│   Output: Behavior change delta report → Miro doc.               │
+│   Output: Behavior change delta report → MiroDoc fragment.       │
 │   Pattern: "X% of learners moved from rarely → often on          │
 │   <behavior>. Top objection still surfacing: <objection from     │
 │   .objections>. Recommended reinforcement: <proof_point>."       │
+│   Aggregator: Streamlit writes miro_plan_delta.json,             │
+│   dispatches codex_bridge.apply_plan(...).                       │
 └─────────────────────────────────────────────────────────────────┘
   │
   ▼
@@ -176,17 +186,17 @@ END
 
 ### 4.1 Model assignment
 
-| Node | Model | Why |
+| Node | Model (LiteLLM id) | Why |
 |---|---|---|
-| Phase A LLM extracts | Featherless cheap | High volume, low reasoning |
-| Phase B per-question synthesis | Featherless mid | Some reasoning, lots of calls |
-| Design doc | Featherless | Cost-conscious; quality contingent (see risks) |
-| Session plan + agendas | Claude Sonnet 4.6 | Heaviest reasoning, structure |
-| Materials (slides, polls, guide) | Claude Sonnet 4.6 | Quality matters most here |
-| Nudges | Featherless cheap | High volume, light reasoning |
-| Delta report | Claude Sonnet 4.6 | Pattern detection across data |
+| Phase A LLM extracts | `featherless_ai/...8B-Instruct` | High volume, low reasoning |
+| Phase B per-question synthesis | `featherless_ai/...70B-Instruct` | Some reasoning, lots of calls |
+| Design doc | `featherless_ai/...70B-Instruct` | Cost-conscious; quality contingent (see risks) |
+| Session plan + agendas | `openai/gpt-4o` | Heaviest reasoning, structure |
+| Materials (slides, polls, guide) | `openai/gpt-4o` | Quality matters most here |
+| Nudges | `featherless_ai/...8B-Instruct` | High volume, light reasoning |
+| Delta report | `openai/gpt-4o` | Pattern detection across data |
 
-LLM access is unified through LiteLLM via LangChain integrations so swapping a model in any node is a one-line change.
+LLM access is unified through LiteLLM so swapping a model in any node is a one-line change in `ROLE_TO_MODEL`. Anthropic was considered for the heavy-reasoning roles but dropped — no Anthropic key available in V0; OpenAI gpt-4o is the chosen flagship.
 
 ### 4.2 Single edit point — invariant
 
@@ -202,6 +212,74 @@ Sessions 1-3 each map to one of Linda's selected behaviors (`SessionPlan.behavio
 - Capture a cross-cutting commitment in the post-poll (one commitment that touches all three).
 
 The integration session uses the same materials sub-graph as the others; only the upstream prompt context differs.
+
+### 4.4 Codex bridge
+
+Python never calls the Miro REST API. Instead, every Miro write happens through a `codex exec` subprocess that drives the user's configured Miro MCP server.
+
+**Prerequisites (one-time setup on the demo machine):**
+
+- Codex CLI installed and on `PATH` (`codex --version` succeeds).
+- Miro MCP server registered in `~/.codex/config.toml` and authorized to the user's Miro account (one-time `/login` flow inside Codex).
+- `MIRO_BOARD_ID` set in `.env`.
+
+**Invocation pattern:**
+
+```python
+# src/growme/miro/codex_bridge.py
+def apply_plan(plan_path: Path, *, board_id: str, timeout: int = 300) -> CodexResult:
+    if os.environ.get("USE_LIVE_MIRO", "true").lower() != "true":
+        return CodexResult(status="dry_run", plan_path=str(plan_path),
+                           stdout="", stderr="", exit_code=0)
+    prompt = (
+        f"Read the JSON plan at {plan_path}. For every item, in declared order, "
+        f"call the appropriate mcp__miro__* tool against board {board_id}. "
+        f"Apply each item exactly as specified — do not skip, do not reorder, do not add. "
+        f"For every created item, print one line `KEY=MIRO_ID` to stdout. "
+        f"When all items are applied, print `BUILD COMPLETE` and exit."
+    )
+    proc = subprocess.run(
+        ["codex", "exec", prompt],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    status = "ok" if proc.returncode == 0 and "BUILD COMPLETE" in proc.stdout else "error"
+    return CodexResult(status=status, plan_path=str(plan_path),
+                       stdout=proc.stdout, stderr=proc.stderr, exit_code=proc.returncode)
+```
+
+**Streamlit UX (Wizard Step 4 + Demo Console):**
+
+- Block on `apply_plan` with `st.spinner("Building on Miro…")`. No streaming for V0.
+- On `status="ok"`: success line + 📐 Open Miro Board deep link.
+- On `status="error"`: collapsible stderr panel, **Retry** button, **Show plan JSON** toggle so the user can hand the plan to Codex manually as a last resort.
+- On `status="dry_run"`: "Dry-run: plan written to `<plan_path>`" + download button. Used for tests/CI.
+
+**`USE_LIVE_MIRO=false` semantics:** the bridge writes the plan JSON to disk (the caller already wrote it before invocation; the bridge just confirms presence) and returns immediately with `status="dry_run"`. Unit tests run in this mode and assert on the JSON shape only — Codex is not a CI dependency.
+
+**Idempotency:** Codex is told explicitly not to skip, reorder, or add items. Plan keys are deterministic (`session_1.slide_3`, `nudges.learner_03.session_1`) so a re-run after partial failure can compare what was created against the plan. (Full re-run of an already-applied plan is not supported in V0; the demo flow runs each `_*.json` once.)
+
+### 4.5 MiroPlan intent format
+
+The contract between Python and Codex is a JSON file matching the `MiroPlan` Pydantic schema (full fields in §9). Coordinates and parent relationships are pixel-precise — Python computes layout in `src/growme/miro/plan_builder.py`, Codex applies verbatim. Codex makes no layout decisions.
+
+```python
+# Sketch — full models in §9
+class MiroPlan(BaseModel):
+    frames:    list[MiroFrame]    = []
+    slides:    list[MiroSlide]    = []   # texts inside frames
+    polls:     list[MiroPoll]     = []   # rendered as text widgets in V0
+    documents: list[MiroDoc]      = []   # facilitator guides + delta report
+    cards:     list[MiroCard]     = []   # nudges
+    stickies:  list[MiroSticky]   = []   # poll-response renders
+```
+
+Each item carries:
+- `key: str` — deterministic identifier (e.g., `session_1.slide_3`) used by Codex to print `key=miro_id` lines on stdout.
+- `parent_key: str | None` — references a `MiroFrame.key` if the item is a child.
+- `x: float`, `y: float` — explicit coordinates relative to the parent (or board origin if top-level).
+- `width: int`, `height: int` (where applicable).
+
+The full plan is serialized to `.growme_sessions/<uuid>/miro_plan_{materials,nudges,delta}.json` — one file per build step. Streamlit reads back the `key=miro_id` mapping from Codex stdout to populate `SessionMaterials.miro_frame_id`, `Nudge.miro_card_id`, and `DeltaReport.miro_doc_id`.
 
 ---
 
@@ -235,7 +313,7 @@ Streamlit reruns the whole script on every interaction. We persist `WizardInputs
 + Bottom-left ──────── Frame "Behavior Delta Report" (Miro Document)
 ```
 
-Each artifact has a stable Miro item ID stored in `GrowMeState`, so we can update + re-link them throughout the run.
+Each artifact has a stable Miro item ID stored in `GrowMeState`, so we can update + re-link them throughout the run. Placement is computed in `src/growme/miro/plan_builder.py` and applied verbatim by Codex; the layout constants there are the single source of truth for board geometry.
 
 ---
 
@@ -369,7 +447,7 @@ BEHAVIOR_MENU = {
 | 6:30 | "Now imagine the trainings happened" | Back to Streamlit Demo Console. Click "Simulate Session 1 complete" → seeded learner responses replay into Miro polls live. Pan back to Miro to show the post-poll table populating. | Replay fixture data into Miro via REST |
 | 7:00 | "And nudges go out" | Click "Generate Session 1 nudges" → switch to Miro Nudges frame, see per-learner email/Slack copy, each tied to that learner's commitment. | Featherless calls per learner |
 | 7:45 | Fast-forward sessions 2-4 | Click through "Simulate Session 2", "Session 3", "Session 4 complete." Watch the polls fill in across all 4 frames. | More fixtures |
-| 8:30 | "And the delta report" | Click "Generate Delta Report" → Miro doc populates: % movement per behavior, top still-surfacing objection, recommended reinforcement | Claude reasoning over poll diff |
+| 8:30 | "And the delta report" | Click "Generate Delta Report" → Miro doc populates: % movement per behavior, top still-surfacing objection, recommended reinforcement | OpenAI gpt-4o reasoning over poll diff; one Codex subprocess to apply the doc |
 | 9:30 | Wrap | Pan out to whole Miro board — 4 sessions + nudges + delta report all visible. "From a behavior gap to a measured behavior change in 10 minutes." | — |
 
 The demo is recorded, not live. Some live-call timing variability is acceptable in editing.
@@ -500,6 +578,79 @@ class DeltaReport(BaseModel):
     full_markdown: str
     miro_doc_id: str
 
+# === MIRO PLAN (Codex-bridge contract) ===
+
+class MiroFrame(BaseModel):
+    key: str                               # e.g. "session_1", "nudges", "header"
+    title: str
+    x: float
+    y: float
+    width: int = 1300
+    height: int = 1100
+    parent_key: None = None                # frames are top-level
+
+class MiroSlide(BaseModel):
+    key: str                               # e.g. "session_1.slide_3"
+    parent_key: str                        # MiroFrame.key
+    title: str
+    body_md: str
+    x: float
+    y: float
+    width: int = 600
+
+class MiroPoll(BaseModel):
+    key: str                               # e.g. "session_1.pre_poll"
+    parent_key: str
+    kind: Literal["pre", "post_commitment"]
+    question: str
+    options: list[str]
+    x: float
+    y: float
+    width: int = 400
+
+class MiroDoc(BaseModel):
+    key: str                               # e.g. "session_1.guide", "delta.report"
+    parent_key: str | None                 # delta report attaches at top level
+    title: str
+    content_md: str
+    x: float
+    y: float
+
+class MiroCard(BaseModel):
+    key: str                               # e.g. "nudges.learner_03.session_1"
+    parent_key: str                        # nudges frame
+    title: str
+    description_md: str
+    x: float
+    y: float
+
+class MiroSticky(BaseModel):
+    key: str                               # e.g. "session_1.pre_poll.response_2"
+    parent_key: str
+    content: str
+    color: str = "yellow"
+    x: float
+    y: float
+
+class MiroPlan(BaseModel):
+    """Pixel-precise instructions for Codex to apply via mcp__miro__* tools."""
+    board_id: str
+    build_step: Literal["materials", "nudges", "delta", "header"]
+    frames:    list[MiroFrame]    = Field(default_factory=list)
+    slides:    list[MiroSlide]    = Field(default_factory=list)
+    polls:     list[MiroPoll]     = Field(default_factory=list)
+    documents: list[MiroDoc]      = Field(default_factory=list)
+    cards:     list[MiroCard]     = Field(default_factory=list)
+    stickies:  list[MiroSticky]   = Field(default_factory=list)
+
+class CodexResult(BaseModel):
+    status: Literal["ok", "error", "dry_run"]
+    plan_path: str
+    stdout: str
+    stderr: str
+    exit_code: int = 0
+    item_ids: dict[str, str] = Field(default_factory=dict)   # parsed from stdout `key=miro_id`
+
 # === ORCHESTRATOR STATE ===
 class GrowMeState(TypedDict):
     wizard_inputs: WizardInputs
@@ -545,6 +696,7 @@ src/growme/
     base_research.py        # Phase A: 4 parallel branches
     behavior_research.py    # Phase B: 3 parallel branches
     apify_clients.py        # website-content-crawler, g2-product-scraper wrappers
+    web_search.py           # Apify google-search-scraper wrapper
     citation.py             # CitedFact factory + provenance helpers
     aliasing.py             # Photon-DB-from-Neon find/replace
     fixtures/               # cached real responses, fallback data
@@ -558,16 +710,21 @@ src/growme/
   sessions/
     plan_node.py
     materials_node.py       # parallel sub-graph: slides + polls + facilitator
-    miro_writers.py         # functions that materialize each artifact via Miro REST
+                            # emits MiroPlan fragments via plan_builder
   nudges/
     node.py
     learner_fixtures.py     # 8 fake learners + responses
   delta_report/
     node.py
+  miro/
+    intent.py               # MiroPlan + child models (frames, slides, polls, docs, cards, stickies)
+    plan_builder.py         # pure functions building plan fragments (replaces sessions/miro_writers.py)
+                            # owns layout constants: HEADER_X, SESSION_X_STEP, NUDGES_X, etc.
+    codex_bridge.py         # apply_plan() — wraps subprocess.run(["codex", "exec", ...])
+                            # honors USE_LIVE_MIRO; parses key=miro_id stdout
   schemas.py                # all Pydantic models in section 9
   behavior_menu.py          # the BEHAVIOR_MENU dict from section 7
-  llm_clients.py            # LiteLLM/LangChain wrappers per provider
-  miro_client.py            # thin wrapper over Miro REST
+  llm_clients.py            # LiteLLM client (Featherless + OpenAI)
 tests/
   test_schemas.py
   test_research_smoke.py
@@ -582,13 +739,13 @@ docs/
 
 | Hour | Phase | Deliverable | Why early |
 |---|---|---|---|
-| 0-1 | **Skeleton** | Repo scaffold, Streamlit shell scaffolded, LangGraph hello-world, Miro auth + write a test card, LiteLLM hello-world with Featherless + Claude + OpenAI. Required env vars (`MIRO_TOKEN`, `MIRO_BOARD_ID`, `APIFY_TOKEN`, `FEATHERLESS_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TAVILY_API_KEY`) read from `.env`. | Smoke-test all integrations *before* building anything substantial |
+| 0-1 | **Skeleton** | Repo scaffold, Streamlit shell scaffolded, LangGraph hello-world, Codex CLI dry-run (emit a tiny test plan; with `USE_LIVE_MIRO=true`, invoke `codex exec` against the configured Miro MCP server and verify a frame appears), LiteLLM hello-world with Featherless + OpenAI. Required env vars (`OPENAI_API_KEY`, `FEATHERLESS_API_KEY`, `APIFY_TOKEN`, `MIRO_BOARD_ID`) and optional flags (`USE_LIVE_RESEARCH`, `USE_LIVE_MIRO`, `GROWME_SESSION_DIR`) read from `.env`. | Smoke-test all integrations *before* building anything substantial |
 | 1-3 | **Wizard + state** | 4-step Streamlit wizard navigating with `st.session_state`. Step 2 renders the 6-behavior menu. Submitting persists `WizardInputs` to a pickle file. | Fully testable without any AI calls |
 | 3-7 | **Research node (Phase A + B)** | Pydantic schemas, Apify clients, 4 Phase A branches in parallel, 3 Phase B branches in parallel, fixture cache in `fixtures/photon_db_*.json` | The "magic." Most algorithmically complex piece — get it right early |
 | 7-10 | **Design doc node + Streamlit edit** | Featherless prompt, render markdown in `st.text_area`, [BUILD ON MIRO] button | First end-to-end milestone: Linda sees a real generated design doc |
-| 10-14 | **Session plan + materials sub-graph** | LangGraph parallel branches, Miro frame creation per session, slides/polls/guide writers | Hardest Miro work — biggest unknowns |
+| 10-14 | **Session plan + materials sub-graph** | LangGraph parallel branches; per-session plan-fragment emitters (`plan_builder.create_session_frame`, `write_slide`, `write_pre_poll`, `write_post_poll`, `write_facilitator_guide`); aggregate to `miro_plan_materials.json`; one `codex_bridge.apply_plan` at end of build | LangGraph nodes emit plan fragments; Codex applies them in a single subprocess per build step |
 | 14-16 | **Demo Console: fast-forward + fixtures** | "Simulate Session N complete" buttons that replay seeded `LearnerResponse` data into Miro polls | Half-day buffer before the hard parts |
-| 16-19 | **Nudges + Delta report** | Featherless nudge generator, Miro card creation per learner, Claude delta report writer | Builds on existing data — should go quickly |
+| 16-19 | **Nudges + Delta report** | Featherless nudge generator → MiroCard fragments → codex apply; OpenAI gpt-4o delta report writer → MiroDoc fragment → codex apply | Builds on existing data — should go quickly |
 | 19-21 | **Polish: aliasing, diagrams, header frame** | Photon→Neon `replace_all`, board cosmetics, header frame with cohort summary, deep links from Streamlit | What makes the demo readable |
 | 21-23 | **Demo dry runs + recording** | Run end-to-end three times, fix anything brittle. Record final take. | Buffer for actual demo prep |
 | 23-24 | **Buffer / sleep** | — | Reality |
@@ -607,10 +764,12 @@ docs/
 ### 12.1 Top risks (ranked)
 
 1. **Apify reliability / rate limits** — Mitigation: cache real responses to `fixtures/` after the first successful run; flip a `USE_LIVE_RESEARCH` flag to switch.
-2. **Miro REST limits / 5 calls/sec** — Mitigation: rate-limit our writes (sleep 0.2s between calls); batch creates where the API supports it; build sessions sequentially in step 4 if parallel hits limits.
-3. **LangGraph state size** — `EnrichedContext` for 3 behaviors with citations can be 30-50 KB. Manageable but watch for prompt bloat in downstream nodes — pass slices, not the whole state.
-4. **Featherless model quality on design doc** — Per the model assignment, design_doc uses Featherless. Risk: lower quality than Claude. Mitigation: tightly-templated prompt with strict JSON schema; if quality is poor at hour 8, swap to Claude in 5 minutes.
-5. **Multi-step wizard state on Streamlit reruns** — Streamlit reruns the whole script on every interaction. Mitigation: persist `WizardInputs`, `EnrichedContext`, `DesignDoc` to pickle files keyed by a session UUID; reload on every step.
+2. **Codex CLI subprocess reliability** — Unknown latency, can stall, may partial-apply on a transient MCP error. Mitigation: 5-minute `subprocess` timeout; on non-zero exit, surface stderr in a Streamlit expander, render a **Retry** button, and a **Show plan JSON** toggle so the user can hand the file to Codex manually as a last resort.
+3. **Miro MCP server availability / auth drift** — Token expiry inside the Miro MCP would silently break a run mid-build. Mitigation: smoke the bridge at the start of each work session (`scripts/smoke_codex_bridge.py`); treat a green smoke as the gate for Phase 9-10 work.
+4. **Codex prompt fidelity / idempotency** — Codex might drop items, recreate duplicates, or reorder. Mitigation: deterministic plan keys (`session_1.slide_3`, `nudges.learner_03.session_1`); the prompt explicitly forbids creativity ("apply each item exactly as specified, in order; do not skip; do not reorder; do not add"); demo flow runs each `_*.json` once per session.
+5. **LangGraph state size** — `EnrichedContext` for 3 behaviors with citations can be 30-50 KB. Manageable but watch for prompt bloat in downstream nodes — pass slices, not the whole state.
+6. **Featherless model quality on design doc** — Per the model assignment, `design_doc` uses Featherless. Risk: lower quality than the OpenAI flagship. Mitigation: tightly-templated prompt with strict JSON schema; if quality is poor at hour 8, swap `ROLE_TO_MODEL["design_doc"]` to `openai/gpt-4o` in one line.
+7. **Multi-step wizard state on Streamlit reruns** — Streamlit reruns the whole script on every interaction. Mitigation: persist `WizardInputs`, `EnrichedContext`, `DesignDoc` to pickle files keyed by a session UUID; reload on every step.
 
 ### 12.2 What's real vs mocked
 
@@ -618,7 +777,7 @@ docs/
 |---|---|---|
 | Apify scraping | ✅ Live by default; demo recorded, not aired live | Cached fixtures available as fallback (`USE_LIVE_RESEARCH=false`) |
 | LLM calls | ✅ All real | — |
-| Miro write | ✅ All real | — |
+| Miro write | ✅ Live by default via `codex exec` + Miro MCP | `USE_LIVE_MIRO=false` writes plan JSON to disk and returns a dry-run result (tests/CI) |
 | Learner responses | ❌ | Pre-seeded JSON for 8 fake learners |
 | Email send | ❌ | Generated copy displayed in Miro card; not actually sent |
 | Slack send | ❌ | Generated copy displayed in Miro card; not actually sent |
