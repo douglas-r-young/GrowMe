@@ -31,7 +31,7 @@ def render():
     if step == 0:
         _step_company_audience()
     elif step == 1:
-        st.warning("Step 2 not implemented yet — see Task 12.")
+        _step_behaviors()
     elif step == 2:
         st.warning("Step 3 not implemented yet — see Task 17 / 18.")
     elif step == 3:
@@ -69,4 +69,36 @@ def _step_company_audience():
         state.update("company_alias", company_alias.strip())
         state.update("audience_description", audience_description.strip())
         _go_to(1)
+        st.rerun()
+
+
+def _step_behaviors():
+    from growme.behavior_menu import BEHAVIOR_MENU, default_pic_behavior_ids
+
+    st.subheader("Step 2 — Pick exactly 3 behaviors")
+    saved = state.get("selected_behavior_ids", default_pic_behavior_ids())
+
+    selected: list[str] = []
+    for bid, tmpl in BEHAVIOR_MENU.items():
+        checked = st.checkbox(
+            f"**{tmpl.name}** — _{tmpl.framework_origin}_",
+            value=(bid in saved),
+            help=tmpl.description,
+            key=f"beh_{bid}",
+        )
+        if checked:
+            selected.append(bid)
+
+    st.divider()
+    st.caption(f"Selected: {len(selected)} / 3")
+
+    col_back, col_next = st.columns(2)
+    if col_back.button("← Back"):
+        _go_to(0)
+        st.rerun()
+
+    next_disabled = len(selected) != 3
+    if col_next.button("Next →", type="primary", disabled=next_disabled):
+        state.update("selected_behavior_ids", selected)
+        _go_to(2)
         st.rerun()
