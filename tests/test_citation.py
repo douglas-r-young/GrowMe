@@ -15,3 +15,4 @@ def test_cited_fact_high_confidence_when_explicit_url():
 def test_cited_fact_low_confidence_for_inferred():
     cf = cited_fact("inferred text", "inference:llm", confidence="low")
     assert cf.confidence == "low"
+    assert cited_fact("x", "inference:llm").confidence == "medium"
