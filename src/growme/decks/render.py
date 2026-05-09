@@ -1,6 +1,8 @@
 """Streamlit helpers for in-app deck preview."""
 from __future__ import annotations
 
+from html import escape as _escape
+
 import streamlit as st
 
 from growme.qr import generate_qr_png
@@ -24,7 +26,9 @@ _CARD_CSS = """
 
 
 def render_deck(deck: SessionDeck) -> None:
-    st.markdown(_CARD_CSS, unsafe_allow_html=True)
+    if not st.session_state.get("growme_css_loaded"):
+        st.markdown(_CARD_CSS, unsafe_allow_html=True)
+        st.session_state["growme_css_loaded"] = True
     for i, slide in enumerate(deck.slides, start=1):
         with st.container():
             st.markdown("<div class='growme-slide-card'>", unsafe_allow_html=True)
@@ -42,7 +46,3 @@ def render_deck(deck: SessionDeck) -> None:
             else:
                 st.markdown(slide.body_md)
             st.markdown("</div>", unsafe_allow_html=True)
-
-
-def _escape(s: str) -> str:
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

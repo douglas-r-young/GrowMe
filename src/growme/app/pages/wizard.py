@@ -161,9 +161,16 @@ def _step_build():
     deck = state.get("deck")
 
     if deck is None:
+        enriched = state.get("enriched_context")
+        edited_md = state.get("design_doc_edited_md")
+        if enriched is None or edited_md is None:
+            st.error("Step 3 hasn't run. Go back and click 🪄 Generate.")
+            if st.button("← Back to Step 3"):
+                _go_to(2)
+                st.rerun()
+            return
+
         if st.button("🚀 Build", type="primary"):
-            enriched = state.get("enriched_context")
-            edited_md = state.get("design_doc_edited_md")
             inputs = _wizard_inputs_from_state()
             session_uuid = state.session_uuid()
             session_dir = Path(os.environ.get("GROWME_SESSION_DIR", ".growme_sessions")) / session_uuid
@@ -181,7 +188,7 @@ def _step_build():
                     from growme.assessment.generator import generate_program_assessment_offline
                     assessment = generate_program_assessment_offline(inputs.selected_behavior_ids)
                 state.update("program_assessment", assessment)
-                s.write("Slide bodies + facilitator guide (parallel)...")
+                s.write("Slide bodies + facilitator guide...")
                 slide_bodies = gen_slide_bodies(plan, enriched)
                 guide_md = gen_facilitator_guide(plan, enriched)
                 s.write("Composing deck + exporting .pptx...")
@@ -219,7 +226,7 @@ def _step_build():
             file_name="facilitator_guide.md",
             mime="text/markdown",
         )
-        st.markdown("[▶ Open Demo Console](?nav=demo_console)")
+        st.caption("▶ Switch to **Demo Console** in the sidebar to run the simulation.")
     with col_qr:
         from growme.qr import generate_qr_png
         st.image(generate_qr_png(deck.pre_qr_url), caption="Pre-poll QR")
