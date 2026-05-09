@@ -7,14 +7,12 @@ dependencies = [
     "streamlit>=1.40",
     "langgraph>=0.2.55",
     "langchain>=0.3",
-    "langchain-anthropic>=0.3",
     "langchain-openai>=0.2",
     "litellm>=1.55",
     "apify-client>=1.7",
     "pydantic>=2.9",
     "python-dotenv>=1.0",
     "requests>=2.32",
-    "tavily-python>=0.5",
 ]
 
 [project.optional-dependencies]
