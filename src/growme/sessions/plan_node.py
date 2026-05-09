@@ -72,9 +72,10 @@ def run(
 def _format_behavior_block(bc: BehaviorContext) -> str:
     examples = "\n".join(f"- {f.text}" for f in bc.findings.examples[:3])
     objections = "\n".join(f"- {f.text}" for f in bc.findings.objections[:3])
+    proof_points = "\n".join(f"- {f.text}" for f in bc.findings.proof_points[:3])
     return (
         f"### {bc.behavior_name}  ({bc.framework_origin})\n"
-        f"Examples:\n{examples}\nObjections:\n{objections}"
+        f"Examples:\n{examples}\nObjections:\n{objections}\nProof points:\n{proof_points}"
     )
 
 
