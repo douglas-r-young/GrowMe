@@ -52,3 +52,12 @@ def get(key: str, default: Any = None) -> Any:
 def set_session_uuid(uid: str) -> None:
     """Used by the assessment page to point at a wizard's session pickle."""
     st.session_state["session_uuid"] = uid
+
+
+def reset_session() -> None:
+    p = _path_for(session_uuid())
+    if p.exists():
+        p.unlink()
+    for k in list(st.session_state.keys()):
+        if k != "session_uuid":
+            del st.session_state[k]

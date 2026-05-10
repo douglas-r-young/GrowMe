@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import os  # noqa: E402
+
 import streamlit as st  # noqa: E402
+
+from growme.app import state  # noqa: E402
 
 st.set_page_config(page_title="GrowMe", page_icon="🌱", layout="wide")
 
@@ -31,6 +35,20 @@ def main():
 
     st.sidebar.title("GrowMe 🌱")
     page = st.sidebar.radio("Navigate", list(PAGES.keys()))
+
+    st.sidebar.divider()
+    uid = state.session_uuid()
+    st.sidebar.caption(f"Session: `{uid[:8]}`")
+
+    base_url = os.environ.get("STREAMLIT_LOCAL_URL", "http://localhost:8501")
+    if state.get("deck"):
+        st.sidebar.markdown(f"[▶ Open pre-poll]({base_url}/?assessment={uid}&kind=pre)")
+        st.sidebar.markdown(f"[▶ Open post-poll]({base_url}/?assessment={uid}&kind=post)")
+
+    if st.sidebar.button("🔄 Reset session"):
+        state.reset_session()
+        st.rerun()
+
     if page == "Wizard":
         from growme.app.pages import wizard
         wizard.render()
