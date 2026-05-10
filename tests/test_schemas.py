@@ -7,6 +7,7 @@ from growme.schemas import (
     AssessmentResponse,
     BehaviorFindings,
     CitedFact,
+    Commitment,
     FrequencyQuestion,
     ProgramAssessment,
     SessionDeck,
@@ -195,9 +196,33 @@ def test_assessment_response_post_carries_commitment():
         commitment="When pipeline review starts, I will state the EB name on my top 3 deals",
     )
     assert r.commitment is not None
+    assert r.commitment.cue == "When"
     assert r.commitment.trigger == "pipeline review starts"
     assert "EB name" in r.commitment.action
     assert r.commitment.render().startswith("When ")
+
+
+@pytest.mark.parametrize("text,expected_cue,expected_trigger", [
+    ("When pipeline review starts, I will state the EB name", "When", "pipeline review starts"),
+    ("Before Tuesday's demo, I will log 2 proof points", "Before", "Tuesday's demo"),
+    ("After my pipeline review, I'll pre-write the EB name", "After", "my pipeline review"),
+    ("If a prospect names a competitor, I will state our differentiator", "If", "a prospect names a competitor"),
+    ("Once the demo wraps, I will send the proof-point follow-up", "Once", "the demo wraps"),
+])
+def test_commitment_from_string_round_trips_all_cues(text, expected_cue, expected_trigger):
+    """Commitment.from_string preserves the original cue word through render()."""
+    c = Commitment.from_string(text)
+    assert c.cue == expected_cue
+    assert c.trigger == expected_trigger
+    # Round-trip: render should reproduce the original (modulo trailing punctuation)
+    assert c.render().startswith(f"{expected_cue} {expected_trigger}, I will ")
+
+
+def test_commitment_defaults_cue_to_when():
+    """Direct Commitment(...) construction without cue defaults to 'When' for back-compat."""
+    c = Commitment(trigger="my next call", action="ask the EB question")
+    assert c.cue == "When"
+    assert c.render() == "When my next call, I will ask the EB question"
 
 
 def test_assessment_response_rejects_non_implementation_intention_commitment():

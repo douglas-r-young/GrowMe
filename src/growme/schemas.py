@@ -10,29 +10,35 @@ NudgeStage = Literal["skeptic", "beginner", "practitioner"]
 
 # === COMMITMENT (structured implementation intention) ===
 
-# Pulls "When [trigger], I('ll| will) [action]" out of a raw commitment string.
-# The trigger is everything between "When " and the first comma OR the "I will"
-# clause; the action is everything after the verb cap.
+# Pulls "[Cue] [trigger], I('ll| will) [action]" out of a raw commitment string.
+# Cue is one of When / Before / After / If / Once — the canonical Gollwitzer
+# habit-stack cues. The trigger is everything between the cue and the first
+# comma OR the "I will" clause; the action is everything after the verb cap.
 _COMMITMENT_RX = re.compile(
-    r"^\s*when\s+(?P<trigger>.+?)[,\s]+i\s*('ll|’ll|’ll|will)\s+(?P<action>.+?)[\s.]*$",
+    r"^\s*(?P<cue>when|before|after|if|once)\s+(?P<trigger>.+?)[,\s]+i\s*('ll|’ll|’ll|will)\s+(?P<action>.+?)[\s.]*$",
     re.IGNORECASE | re.DOTALL,
 )
+
+CommitmentCue = Literal["When", "Before", "After", "If", "Once"]
 
 
 class Commitment(BaseModel):
     """Structured view of a Gollwitzer implementation intention.
 
-    Stored as separate trigger and action so the nudge generator can address
-    them precisely ("Your commitment fires when [trigger] — has it happened
-    yet this week? Did [action]?"). `first_attempt_date` is reserved for V1.
+    Stored as cue + trigger + action so the nudge generator can address them
+    precisely ("Your commitment fires when [trigger] — has it happened yet
+    this week? Did [action]?"). Cue is one of When / Before / After / If /
+    Once — the canonical habit-stack cues. `first_attempt_date` is reserved
+    for V1.
     """
+    cue: CommitmentCue = "When"
     trigger: str = Field(min_length=2)
     action: str = Field(min_length=2)
     first_attempt_date: str | None = None
 
     @classmethod
     def from_string(cls, text: str) -> "Commitment":
-        """Parse 'When [trigger], I will [action]' into a Commitment.
+        """Parse '[Cue] [trigger], I will [action]' into a Commitment.
 
         Raises ValueError if the input doesn't match the implementation-intention
         form (driven by the same regex `has_implementation_intention` uses, plus
@@ -42,21 +48,26 @@ class Commitment(BaseModel):
         if not has_implementation_intention(text):
             raise ValueError(
                 f"Commitment text {text!r} is not a valid implementation intention. "
-                "Use 'When [specific trigger], I will [specific action]' form. "
-                "Forbidden vague triggers: 'when I have time', 'whenever I', "
+                "Use 'When/Before/After/If/Once [specific trigger], I will [specific action]' "
+                "form. Forbidden vague triggers: 'when I have time', 'whenever I', "
                 "'during the week'."
             )
         m = _COMMITMENT_RX.match(text)
         if not m:
             raise ValueError(
-                f"Could not parse {text!r} into trigger + action. "
-                "Expected 'When X, I will Y' or 'When X I'll Y'."
+                f"Could not parse {text!r} into cue + trigger + action. "
+                "Expected 'When/Before/After/If/Once X, I will Y'."
             )
-        return cls(trigger=m.group("trigger").strip(), action=m.group("action").strip())
+        cue: CommitmentCue = m.group("cue").capitalize()  # type: ignore[assignment]
+        return cls(
+            cue=cue,
+            trigger=m.group("trigger").strip(),
+            action=m.group("action").strip(),
+        )
 
     def render(self) -> str:
-        """Round-trip back to natural form."""
-        return f"When {self.trigger}, I will {self.action}"
+        """Round-trip back to natural form, preserving the original cue."""
+        return f"{self.cue} {self.trigger}, I will {self.action}"
 
 
 # === INPUTS ===
@@ -284,10 +295,10 @@ class ProgramAssessment(BaseModel):
         bad = [c for c in v if not has_implementation_intention(c)]
         if bad:
             raise ValueError(
-                "commitment_options must each use 'When [trigger], I will [action]' "
-                "form (Gollwitzer implementation intentions). Banned vague triggers: "
-                "'when I have time', 'whenever I', 'during the week'. Offending: "
-                f"{bad!r}"
+                "commitment_options must each use 'When/Before/After/If/Once "
+                "[trigger], I will [action]' form (Gollwitzer implementation "
+                "intentions). Banned vague triggers: 'when I have time', "
+                f"'whenever I', 'during the week'. Offending: {bad!r}"
             )
         return v
 

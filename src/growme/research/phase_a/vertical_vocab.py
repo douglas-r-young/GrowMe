@@ -9,7 +9,7 @@ from growme.research.apify_clients import run_website_crawler
 
 
 class _Vocab(BaseModel):
-    terms: list[str] = Field(default_factory=list, min_length=5)
+    terms: list[str] = Field(default_factory=list, min_length=5, max_length=15)
 
     @field_validator("terms")
     @classmethod
@@ -19,8 +19,9 @@ class _Vocab(BaseModel):
 
 VOCAB_SYSTEM = (
     "You extract domain-specific vocabulary. Given crawled marketing content, "
-    "return 10-15 short technical terms or product nouns specific to this company's "
-    "vertical. Avoid generic SaaS terms (e.g., 'SaaS', 'platform'). Single words or short phrases. "
+    "return BETWEEN 5 AND 15 short technical terms or product nouns specific to this company's "
+    "vertical. STOP after 15 terms — do not exceed 15. "
+    "Avoid generic SaaS terms (e.g., 'SaaS', 'platform'). Single words or short phrases. "
     "Return strictly as JSON object with a 'terms' array."
 )
 

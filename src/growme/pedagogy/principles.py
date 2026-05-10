@@ -51,15 +51,19 @@ BEHAVIOR ALTITUDE (the difference between a goal and a behavior):
 
 IMPLEMENTATION_INTENTION_RULES = """\
 IMPLEMENTATION INTENTIONS (Gollwitzer — the actual mechanism behind commitment):
-- Every commitment uses "When [specific trigger], I will [specific action]" form.
-- Triggers must be event-bound or time-bound and reference something already in the
-  rep's routine: a meeting type ("during pipeline review"), a tool action ("when I
-  open a new opp"), a calendar event ("before Tuesday's demo"). Forbidden vague
-  triggers: "when I have time", "whenever I", "during the week".
+- Every commitment uses "[Cue] [specific trigger], I will [specific action]" form,
+  where Cue is one of: When, Before, After, If, Once. Prefer Before/After when
+  the trigger is already in the rep's calendar — the existing routine becomes
+  the built-in cue (habit-stacking). Reserve "If" for response-to-stimulus
+  commitments.
+- Triggers must be event-bound or time-bound and reference something already in
+  the rep's routine: a meeting type ("during pipeline review"), a tool action
+  ("when I open a new opp"), a calendar event ("before Tuesday's demo"), a
+  routine completion ("after my pipeline review"). Forbidden vague triggers:
+  "when I have time", "whenever I", "during the week", "after a while",
+  "before too long".
 - Actions must be verifiable. "Ask the EB the budget question" beats "qualify better".
 - One trigger → one action. Compound commitments fail; split or pick one.
-- Where possible, stack the new behavior on an existing one ("After my pipeline
-  review, I will…"). Existing routine = built-in cue.
 """
 """Source: full_context.md §3 implementation intentions, habit research."""
 

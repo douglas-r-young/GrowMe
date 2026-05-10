@@ -38,9 +38,25 @@ Output strict JSON with exactly two fields:
     the rep does the behavior in their typical week ("How often do you …?").
     Do NOT include answer options — those are appended downstream.
   commitment_options: list of 4-5 short, concrete actions a rep could pledge to
-    take in the next 7 days. Each MUST use "When [trigger], I will [action]" form
-    (Gollwitzer implementation intentions). Ground each in the proof points where
-    possible.
+    take in the next 7 days. Each MUST start with one of these implementation-
+    intention cues, followed by a specific event-bound trigger, a comma, and a
+    verifiable action introduced by "I will" or "I'll":
+      "When [trigger], I will [action]"
+      "Before [trigger], I will [action]"
+      "After [trigger], I will [action]"
+      "If [trigger], I will [action]"
+      "Once [trigger], I will [action]"
+    Prefer Before/After when the trigger is already in the rep's calendar
+    (habit-stacking — the existing routine becomes the built-in cue). Reserve
+    "If" for response-to-stimulus commitments. Examples:
+      - "Before Tuesday's pipeline review, I will pre-write the economic-buyer name for each open opp."
+      - "After my next discovery call ends, I will log 2 proof points against the top competitor in the deal record."
+      - "When I open a new opportunity in Salesforce, I will fill in the outcome statement before adding the next capability."
+      - "If a prospect names a competitor on a call, I will state our differentiator before they finish framing."
+    Forbidden vague triggers: "when I have time", "whenever I", "during the week",
+    "after a while", "before too long". Triggers must be event-bound or
+    time-bound to a real, repeatable moment. Ground each option in the proof
+    points where possible.
 
 {ASSESSMENT_PRINCIPLES}
 """

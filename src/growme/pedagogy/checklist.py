@@ -137,7 +137,7 @@ PER_PROGRAM_CHECKS: list[CheckItem] = [
 
 
 _IMPL_INTENTION_RX = re.compile(
-    r"\bwhen\b\s+.+?[,\s]+i('|’|’)?(\s*ll|\s+will)\s+",
+    r"\b(?:when|before|after|if|once)\b\s+.+?[,\s]+i('|’|’)?(\s*ll|\s+will)\s+",
     re.IGNORECASE,
 )
 
@@ -148,6 +148,8 @@ _BANNED_VAGUE_TRIGGERS = (
     "whenever i can",
     "during the week",
     "at some point",
+    "after a while",
+    "before too long",
 )
 
 

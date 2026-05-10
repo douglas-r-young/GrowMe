@@ -131,6 +131,11 @@ def test_synth_system_flags_resistance_patterns():
     "When pipeline review starts, I will state the EB name",
     "When I open Salesforce, I'll fill in the EB field",
     "When my Tuesday demo ends, I will note 3 budget questions in the deal record",
+    # Habit-stack cues — pedagogy/principles.py explicitly endorses these
+    "Before Tuesday's pipeline review, I will pre-write the EB name for each open opp",
+    "After my next discovery call ends, I will log 2 proof points against the top competitor",
+    "If a prospect names a competitor on a call, I will state our differentiator before they finish framing",
+    "Once the demo wraps, I'll send the proof-point follow-up within the hour",
 ])
 def test_implementation_intention_accepts_well_formed(text: str):
     assert has_implementation_intention(text), f"should accept: {text!r}"
@@ -141,6 +146,8 @@ def test_implementation_intention_accepts_well_formed(text: str):
     "When I have time, I will work on this",
     "Whenever I remember, I will quantify pain",
     "During the week, I will ask the budget question",
+    "After a while, I will get to it",
+    "Before too long, I will start practicing",
     "",
     "Just qualify better",
 ])

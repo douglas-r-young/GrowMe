@@ -14,6 +14,7 @@ import os
 import threading
 from contextlib import nullcontext
 
+import json_repair
 import litellm
 from pydantic import BaseModel
 
@@ -102,7 +103,7 @@ def complete_json(
     schema: type[BaseModel],
     *,
     temperature: float = 0.1,
-    max_tokens: int = 4096,
+    max_tokens: int = 8000,
     max_retries: int = 2,
 ) -> BaseModel:
     """Completion that must return JSON validating against `schema`. Retries with feedback."""
@@ -122,10 +123,15 @@ def complete_json(
             role, full_system, prompt,
             temperature=temperature, max_tokens=max_tokens,
         )
+        stripped = _strip_fences(text)
         try:
-            return schema.model_validate_json(_strip_fences(text))
+            return schema.model_validate_json(stripped)
         except Exception as e:
-            last_err = str(e)
+            try:
+                repaired = json_repair.repair_json(stripped)
+                return schema.model_validate_json(repaired)
+            except Exception:
+                last_err = str(e)
     raise ValueError(f"complete_json failed after {max_retries+1} attempts: {last_err}")
 
 
