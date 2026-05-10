@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   BookOpen,
-  ClipboardCheck,
   Download,
   Loader2,
   Mail,
@@ -38,12 +37,6 @@ export function ProgramMaterials({
     const created = await api.createBuildJob(sessionId);
     const finalJob = await waitForJob(created.job_id, setJob);
     if (finalJob.status === "complete") await onReload();
-    setBusy(false);
-  }
-
-  async function simulate() {
-    setBusy(true);
-    onSnapshot(await api.runSimulation(sessionId));
     setBusy(false);
   }
 
@@ -115,11 +108,6 @@ export function ProgramMaterials({
         {sendStatus ? <p className="status-message">{sendStatus}</p> : null}
       </section>
       <section className="panel">
-        <PanelTitle icon={<PlayCircle size={18} />} title="Simulation" />
-        <p>Use fixture learner responses to generate nudges and the behavior delta report.</p>
-        <button className="button primary" disabled={busy} onClick={simulate}>Run full simulation</button>
-      </section>
-      <section className="panel">
         <PanelTitle icon={<BookOpen size={18} />} title="Deck preview" />
         <div className="slide-preview-list">
           {snapshot.deck.slides.map((slide, index) => (
@@ -131,12 +119,6 @@ export function ProgramMaterials({
           ))}
         </div>
       </section>
-      {snapshot.delta_report ? (
-        <section className="panel">
-          <PanelTitle icon={<ClipboardCheck size={18} />} title="Delta Report" />
-          <MarkdownLite text={snapshot.delta_report.full_markdown} />
-        </section>
-      ) : null}
     </>
   );
 }

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import App from "./App";
 import { AssetLibrary } from "./components/AssetLibrary";
+import type { StateSnapshot } from "./types";
 
 const behaviors = [
   {
@@ -29,7 +30,7 @@ const behaviors = [
   }
 ];
 
-const emptySnapshot = {
+const emptySnapshot: StateSnapshot = {
   session_uuid: "session-1",
   setup: {},
   wizard_inputs: null,
@@ -46,7 +47,46 @@ const emptySnapshot = {
   nudges: [],
   delta_report: null,
   sim_complete: false,
+  last_job: null,
   assets: []
+};
+
+const builtSnapshot: StateSnapshot = {
+  ...emptySnapshot,
+  setup: {
+    program_name: "Photon DB discovery sprint",
+    company_alias: "Photon DB",
+    audience_preset: "Enterprise AEs"
+  },
+  selected_behavior_ids: behaviors.map((behavior) => behavior.id),
+  program_assessment: {
+    pre_questions: behaviors.map((behavior) => ({
+      behavior_id: behavior.id,
+      prompt: `How often do you ${behavior.name}?`,
+      options: ["Never", "Rarely", "Sometimes", "Often", "Always"]
+    })),
+    commitment_options: []
+  },
+  deck: {
+    session_number: 1,
+    title: "Photon DB discovery sprint",
+    behavior_ids: behaviors.map((behavior) => behavior.id),
+    slides: [],
+    facilitator_guide_md: "# Guide",
+    manager_briefing_md: "# Briefing",
+    pre_qr_url: "http://localhost:5173/?assessment=session-1&kind=pre",
+    post_qr_url: "http://localhost:5173/?assessment=session-1&kind=post"
+  },
+  assets: [
+    {
+      id: "deck",
+      name: "Session Deck",
+      type: "Presentation",
+      status: "Ready",
+      description: "PowerPoint deck",
+      download_url: "/api/sessions/session-1/downloads/deck"
+    }
+  ]
 };
 
 function mockFetch(handler: (url: string, init?: RequestInit) => unknown) {
@@ -67,6 +107,72 @@ describe("GrowMe React app", () => {
     localStorage.clear();
     history.replaceState(null, "", "/");
     vi.restoreAllMocks();
+  });
+
+  test("renders Home by default with the hackathon sidebar and opens Step 1 from Add Program", async () => {
+    mockFetch((url, init) => {
+      if (url.endsWith("/api/sessions") && init?.method === "POST") {
+        return { session_uuid: "session-1" };
+      }
+      if (url.endsWith("/api/behavior-menu")) {
+        return { behaviors, default_selected_behavior_ids: behaviors.map((b) => b.id) };
+      }
+      if (url.endsWith("/api/sessions/session-1") && !init?.method) {
+        return emptySnapshot;
+      }
+      return {};
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /Current Programs/i })).toBeInTheDocument();
+    for (const label of ["Home", "Analytics", "Settings", "Help Center", "Sign Out"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+
+    await userEvent.click(screen.getByRole("button", { name: /Add Program/i }));
+
+    expect(await screen.findByRole("heading", { name: /Program Setup/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Organization display name/i)).toHaveValue("Photon DB");
+  });
+
+  test("renders deterministic mocked Analytics and expands commitment statements", async () => {
+    mockFetch((url, init) => {
+      if (url.endsWith("/api/sessions") && init?.method === "POST") {
+        return { session_uuid: "session-1" };
+      }
+      if (url.endsWith("/api/behavior-menu")) {
+        return { behaviors, default_selected_behavior_ids: behaviors.map((b) => b.id) };
+      }
+      if (url.endsWith("/api/sessions/session-1") && !init?.method) {
+        return builtSnapshot;
+      }
+      return {};
+    });
+
+    render(<App />);
+
+    await screen.findByRole("heading", { name: /Current Programs/i });
+    expect(screen.queryByText("Pre-survey")).not.toBeInTheDocument();
+    expect(screen.queryByText("Commitment pick")).not.toBeInTheDocument();
+    expect(screen.queryByText("Active session")).not.toBeInTheDocument();
+    expect(screen.queryByText("session-")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Analytics" }));
+
+    expect(await screen.findByRole("heading", { name: /Behavior Change Deltas/i })).toBeInTheDocument();
+    expect(screen.getByText(/Quantify customer pain in business impact terms/i)).toBeInTheDocument();
+    expect(screen.getByText(/Connect product capabilities to required outcomes/i)).toBeInTheDocument();
+    expect(screen.getByText(/Differentiate from named competitors/i)).toBeInTheDocument();
+    expect(screen.getByText("94%")).toBeInTheDocument();
+    expect(screen.getByText("91")).toBeInTheDocument();
+    expect(screen.getByText("86%")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Behavior filter/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(11);
+
+    await userEvent.click(screen.getByRole("button", { name: /Load 10 more/i }));
+
+    expect(screen.getAllByRole("row")).toHaveLength(21);
   });
 
   test("saves setup through the API and advances to real behavior objectives", async () => {
@@ -92,6 +198,8 @@ describe("GrowMe React app", () => {
 
     render(<App />);
 
+    expect(await screen.findByRole("heading", { name: /Current Programs/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Add Program/i }));
     expect(await screen.findByRole("heading", { name: /Program Setup/i })).toBeInTheDocument();
     await userEvent.clear(screen.getByLabelText(/Organization display name/i));
     await userEvent.type(screen.getByLabelText(/Organization display name/i), "Photon DB");
