@@ -77,6 +77,7 @@ class WizardInputs(BaseModel):
     company_alias: str
     audience_description: str
     selected_behavior_ids: list[str]
+    reference_urls: list[str] = Field(default_factory=list)
     program_length_sessions: int = 1  # V0 demo: single session covering all 3 behaviors
     session_duration_min: int = 60
 

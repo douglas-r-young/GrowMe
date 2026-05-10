@@ -30,11 +30,11 @@ def run(inputs: WizardInputs) -> EnrichedContext:
         if cached is not None:
             return cached
 
-    base_future_args = (REAL_URL, REAL_COMPANY, G2_URL)
     behavior_args = inputs.selected_behavior_ids
+    extra_urls = list(inputs.reference_urls)
 
     with ThreadPoolExecutor(max_workers=4) as ex:
-        base_future = ex.submit(run_phase_a, *base_future_args)
+        base_future = ex.submit(run_phase_a, REAL_URL, REAL_COMPANY, G2_URL, extra_urls=extra_urls)
         beh_futures = {ex.submit(run_phase_b, bid, REAL_COMPANY): bid for bid in behavior_args}
 
         base = base_future.result()

@@ -1,0 +1,1811 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GrowMe Cold Open</title>
+  <style>
+    :root {
+      --ink: #1f2328;
+      --muted: #6b7280;
+      --line: #d9dee7;
+      --chrome: #f3f4f7;
+      --shadow: 0 28px 70px rgba(20, 24, 33, 0.28);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0b0d12;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .shell {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 28% 18%, rgba(80, 91, 116, 0.35), transparent 34%),
+        linear-gradient(135deg, #11141c 0%, #05060a 100%);
+    }
+
+    .stage {
+      position: relative;
+      width: min(100vw, 177.7778vh);
+      height: min(100vh, 56.25vw);
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      background: #c8cbd1;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 40px 110px rgba(0,0,0,0.55);
+      isolation: isolate;
+    }
+
+    .stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      background:
+        linear-gradient(rgba(255,255,255,0.045) 50%, rgba(0,0,0,0.035) 50%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 4px);
+      background-size: 100% 4px, 4px 100%;
+      mix-blend-mode: overlay;
+      opacity: 0.45;
+    }
+
+    .frame {
+      position: absolute;
+      inset: 0;
+      display: none;
+      overflow: hidden;
+      background:
+        linear-gradient(145deg, #e4e7eb 0%, #c4cad2 52%, #aeb6c2 100%);
+      filter: saturate(0.82) contrast(0.96);
+    }
+
+    .frame.active {
+      display: block;
+    }
+
+    .camera {
+      position: absolute;
+      inset: 0;
+      transform-origin: 50% 50%;
+      will-change: transform;
+    }
+
+    .desktop {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 78% 18%, rgba(255,255,255,0.44), transparent 20%),
+        radial-gradient(circle at 20% 80%, rgba(86, 102, 128, 0.2), transparent 28%),
+        linear-gradient(145deg, #e7ebf0 0%, #c5cbd4 42%, #aeb7c3 100%);
+    }
+
+    .desktop::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(90deg, rgba(35,44,62,0.035) 1px, transparent 1px),
+        linear-gradient(rgba(35,44,62,0.035) 1px, transparent 1px);
+      background-size: 72px 72px;
+      opacity: 0.55;
+    }
+
+    .menu-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      color: #1f2530;
+      font-size: 13px;
+      background: rgba(248, 250, 252, 0.74);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(86, 95, 112, 0.18);
+      z-index: 20;
+    }
+
+    .menu-left,
+    .menu-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c840; }
+
+    .window {
+      position: absolute;
+      background: #fff;
+      border: 1px solid rgba(88, 96, 112, 0.28);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .window.soft {
+      filter: blur(0.8px) saturate(0.82);
+      opacity: 0.92;
+    }
+
+    .window.chrome {
+      background: #f8fafc;
+    }
+
+    .window-top {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      background: #f1f3f6;
+      border-bottom: 1px solid #dde2eb;
+    }
+
+    .traffic {
+      display: flex;
+      gap: 7px;
+      margin-right: 9px;
+    }
+
+    .browser-bar {
+      height: 82px;
+      background: #eef1f5;
+      border-bottom: 1px solid #d8dde6;
+    }
+
+    .tabs {
+      height: 38px;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      padding: 7px 12px 0 12px;
+      overflow: hidden;
+    }
+
+    .tab {
+      min-width: 150px;
+      max-width: 210px;
+      height: 31px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 10px;
+      border-radius: 9px 9px 0 0;
+      color: #4b5563;
+      font-size: 13px;
+      background: #dfe4ec;
+      border: 1px solid rgba(124, 134, 151, 0.28);
+      border-bottom: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab.active-tab {
+      color: #1f2937;
+      background: #fff;
+      box-shadow: 0 -1px 0 rgba(255,255,255,0.8) inset;
+    }
+
+    .favicon {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      flex: 0 0 auto;
+      background: #94a3b8;
+    }
+
+    .favicon.doc { background: #4285f4; }
+    .favicon.slide { background: #d24726; }
+    .favicon.survey { background: #00bf6f; }
+    .favicon.slack { background: #611f69; }
+    .favicon.cal { background: #1a73e8; }
+    .favicon.sheet { background: #188038; }
+    .favicon.sales { background: #00a1e0; }
+    .favicon.note { background: #111827; }
+    .favicon.mail { background: #d93025; }
+    .favicon.web { background: #64748b; }
+    .favicon.video { background: #cc0000; }
+
+    .address {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+    }
+
+    .address-pill {
+      flex: 1;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      color: #6b7280;
+      font-size: 13px;
+      background: #fff;
+      border: 1px solid #d9dee7;
+      border-radius: 999px;
+    }
+
+    .toolbar-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #d9dee7;
+      position: relative;
+    }
+
+    .toolbar-icon::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+      background: #9aa4b2;
+    }
+
+    .cursor {
+      position: absolute;
+      width: 30px;
+      height: 42px;
+      z-index: 35;
+      transform: rotate(-8deg);
+      filter: drop-shadow(0 4px 5px rgba(0,0,0,0.35));
+      animation: cursorTwitch 1.7s ease-in-out infinite;
+    }
+
+    .cursor::before {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 0;
+      width: 0;
+      height: 0;
+      border-left: 21px solid #111827;
+      border-top: 31px solid transparent;
+      border-bottom: 8px solid transparent;
+      transform: skewY(-10deg);
+    }
+
+    .cursor::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 7px;
+      width: 0;
+      height: 0;
+      border-left: 11px solid #fff;
+      border-top: 17px solid transparent;
+      border-bottom: 4px solid transparent;
+      transform: skewY(-10deg);
+    }
+
+    @keyframes cursorTwitch {
+      0%, 68%, 100% { transform: translate(0,0) rotate(-8deg); }
+      75% { transform: translate(5px,-3px) rotate(-8deg); }
+      84% { transform: translate(1px,2px) rotate(-8deg); }
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      background: #d93025;
+    }
+
+    .doc-content {
+      height: calc(100% - 82px);
+      display: grid;
+      grid-template-columns: 1fr 330px;
+      background: #f7f8fb;
+    }
+
+    .doc-page {
+      width: 760px;
+      height: 820px;
+      margin: 34px auto;
+      padding: 58px 68px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(31,41,55,0.12);
+      border: 1px solid #e5e7eb;
+    }
+
+    .doc-page h1 {
+      margin: 0 0 18px;
+      font-size: 31px;
+      font-weight: 500;
+      color: #202124;
+    }
+
+    .doc-page h2 {
+      margin: 28px 0 8px;
+      font-size: 18px;
+      color: #374151;
+    }
+
+    .doc-line {
+      height: 13px;
+      margin: 11px 0;
+      border-radius: 4px;
+      background: #cfd6e0;
+    }
+
+    .doc-line.short { width: 58%; }
+    .doc-line.mid { width: 76%; }
+    .doc-line.blue { background: #cfe0ff; }
+    .doc-line.green { background: #d7eadc; }
+
+    .change {
+      background: #e8f0fe;
+      color: #1967d2;
+      padding: 1px 4px;
+      border-radius: 4px;
+      border-bottom: 2px solid #1967d2;
+    }
+
+    .doc-list {
+      margin: 18px 0 0 18px;
+      color: #374151;
+      font-size: 18px;
+      line-height: 1.8;
+    }
+
+    .comments {
+      padding: 42px 22px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .comment {
+      background: #fff;
+      border: 1px solid #dce2ea;
+      border-left: 4px solid #fbbc04;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 8px 20px rgba(31,41,55,0.08);
+      color: #2f3642;
+      font-size: 14px;
+    }
+
+    .comment strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #111827;
+      font-size: 13px;
+    }
+
+    .ppt-layout {
+      height: calc(100% - 38px);
+      display: grid;
+      grid-template-columns: 245px 1fr;
+      background: #f7f4f2;
+    }
+
+    .ppt-ribbon {
+      height: 58px;
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 22px;
+      color: #6b381f;
+      background: #f4e5dc;
+      border-bottom: 1px solid #dec9bd;
+      font-size: 13px;
+    }
+
+    .ribbon-chip {
+      height: 28px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 6px;
+      background: #fff7ed;
+      border: 1px solid #dfc2ad;
+    }
+
+    .slide-thumbs {
+      padding: 18px 16px;
+      overflow: hidden;
+      background: #faf7f4;
+      border-right: 1px solid #e4d6cd;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .thumb {
+      height: 52px;
+      display: grid;
+      grid-template-columns: 26px 1fr;
+      align-items: center;
+      gap: 8px;
+      color: #72513f;
+      font-size: 12px;
+    }
+
+    .thumb-card {
+      height: 46px;
+      border-radius: 4px;
+      border: 1px solid #dbcac0;
+      background:
+        linear-gradient(#fff, #fff) padding-box,
+        linear-gradient(135deg, #d24726, #f3b391) border-box;
+    }
+
+    .thumb.placeholder .thumb-card {
+      background: #f0ece8;
+      border-style: dashed;
+    }
+
+    .slide-workspace {
+      display: grid;
+      place-items: center;
+      padding-top: 58px;
+      background: #ede8e4;
+    }
+
+    .slide-canvas {
+      width: 940px;
+      height: 529px;
+      padding: 56px 72px;
+      background: #fff;
+      box-shadow: 0 12px 38px rgba(83, 50, 32, 0.22);
+      border: 1px solid #e5d5cb;
+    }
+
+    .slide-canvas h1 {
+      margin: 0 0 28px;
+      font-size: 44px;
+      font-weight: 600;
+      color: #2f241d;
+    }
+
+    .slide-bullets {
+      font-size: 28px;
+      line-height: 1.42;
+      color: #3f332c;
+    }
+
+    .slide-bullets li {
+      margin: 18px 0;
+    }
+
+    .unfinished {
+      display: inline-block;
+      min-width: 195px;
+      height: 28px;
+      vertical-align: -5px;
+      border-bottom: 3px solid #d24726;
+      background: linear-gradient(90deg, rgba(210,71,38,0.12), transparent);
+    }
+
+    .survey-page {
+      height: calc(100% - 82px);
+      display: grid;
+      grid-template-columns: 286px 1fr;
+      background: #f6f7f8;
+    }
+
+    .survey-side {
+      padding: 28px 22px;
+      color: #334155;
+      background: #ffffff;
+      border-right: 1px solid #dde3ea;
+    }
+
+    .survey-side h3 {
+      margin: 0 0 22px;
+      font-size: 16px;
+    }
+
+    .side-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .side-item.active-side {
+      background: #e7f8f0;
+      color: #007a4d;
+      font-weight: 600;
+    }
+
+    .survey-builder {
+      padding: 42px 74px;
+      position: relative;
+    }
+
+    .survey-title {
+      color: #172033;
+      font-size: 34px;
+      font-weight: 650;
+      margin-bottom: 12px;
+    }
+
+    .survey-subtitle {
+      color: #64748b;
+      font-size: 16px;
+      margin-bottom: 30px;
+    }
+
+    .question-card {
+      width: 860px;
+      padding: 22px 24px;
+      margin-bottom: 18px;
+      border: 1px solid #dbe3ec;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 6px 18px rgba(30,41,59,0.06);
+    }
+
+    .question-card h4 {
+      margin: 0 0 16px;
+      color: #111827;
+      font-size: 18px;
+    }
+
+    .option-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .option-pill {
+      height: 32px;
+      padding: 0 14px;
+      display: inline-flex;
+      align-items: center;
+      color: #475569;
+      border: 1px solid #d9e0e9;
+      border-radius: 999px;
+      font-size: 13px;
+      background: #fafafa;
+    }
+
+    .add-question {
+      position: absolute;
+      left: 910px;
+      top: 520px;
+      height: 46px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 999px;
+      background: #00bf6f;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      box-shadow: 0 16px 35px rgba(0, 125, 74, 0.28);
+    }
+
+    .plus {
+      width: 21px;
+      height: 21px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.22);
+      font-weight: 800;
+    }
+
+    .slack {
+      height: calc(100% - 38px);
+      display: grid;
+      grid-template-columns: 248px 1fr;
+      background: #fff;
+    }
+
+    .slack-side {
+      padding: 20px 16px;
+      color: #e9d7ef;
+      background: #3f0e40;
+    }
+
+    .slack-side h3 {
+      margin: 0 0 24px;
+      color: #fff;
+      font-size: 19px;
+    }
+
+    .slack-channel {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      border-radius: 6px;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .slack-channel.active-channel {
+      background: #1164a3;
+      color: #fff;
+    }
+
+    .slack-main {
+      display: grid;
+      grid-template-rows: 64px 1fr 86px;
+      background: #fff;
+    }
+
+    .slack-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .slack-name {
+      font-size: 19px;
+      font-weight: 700;
+    }
+
+    .slack-time {
+      color: #8a8f98;
+      font-size: 13px;
+    }
+
+    .messages {
+      padding: 24px 28px;
+      overflow: hidden;
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      background: #64748b;
+    }
+
+    .avatar.amber { background: #b45309; }
+    .avatar.blue { background: #2563eb; }
+    .avatar.sarah { background: #0f766e; }
+
+    .message-top {
+      color: #111827;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .message-time {
+      margin-left: 8px;
+      color: #8b949e;
+      font-weight: 400;
+      font-size: 12px;
+    }
+
+    .message-copy {
+      margin-top: 4px;
+      color: #24292f;
+      font-size: 17px;
+      line-height: 1.42;
+    }
+
+    .message.latest {
+      padding: 18px 16px 18px 0;
+      border-top: 1px solid #f0f1f3;
+      background: linear-gradient(90deg, rgba(255,245,218,0.58), transparent 75%);
+    }
+
+    .typing {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 28px;
+      border-top: 1px solid #e5e7eb;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .typing-bubble {
+      width: 58px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border-radius: 17px;
+      background: #f1f3f5;
+    }
+
+    .typing-bubble i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #8a8f98;
+      animation: typingDot 1.1s ease-in-out infinite;
+    }
+
+    .typing-bubble i:nth-child(2) { animation-delay: 0.15s; }
+    .typing-bubble i:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes typingDot {
+      0%, 70%, 100% { transform: translateY(0); opacity: 0.55; }
+      35% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    .calendar-page {
+      height: calc(100% - 82px);
+      display: grid;
+      grid-template-rows: 72px 1fr;
+      background: #fff;
+    }
+
+    .calendar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .calendar-title {
+      font-size: 24px;
+      color: #202124;
+      font-weight: 500;
+    }
+
+    .cal-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .control {
+      height: 32px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #dadce0;
+      border-radius: 16px;
+      color: #3c4043;
+      font-size: 13px;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: 72px repeat(7, 1fr);
+      grid-template-rows: 58px repeat(10, 1fr);
+      min-height: 0;
+    }
+
+    .day-head {
+      padding: 9px 10px;
+      border-left: 1px solid #edf0f3;
+      border-bottom: 1px solid #e5e7eb;
+      color: #5f6368;
+      font-size: 13px;
+    }
+
+    .day-head strong {
+      display: block;
+      color: #202124;
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    .day-head.today strong {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      background: #1a73e8;
+    }
+
+    .time-label {
+      padding: 7px 12px 0 0;
+      border-right: 1px solid #edf0f3;
+      color: #9aa0a6;
+      text-align: right;
+      font-size: 12px;
+    }
+
+    .cal-cell {
+      position: relative;
+      border-left: 1px solid #edf0f3;
+      border-bottom: 1px solid #edf0f3;
+    }
+
+    .cal-event {
+      position: absolute;
+      left: 7px;
+      right: 7px;
+      top: 5px;
+      min-height: 31px;
+      padding: 6px 8px;
+      border-radius: 7px;
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.2;
+      overflow: hidden;
+      background: #1a73e8;
+      box-shadow: 0 3px 9px rgba(20, 91, 187, 0.22);
+    }
+
+    .event-red { background: #c5221f; }
+    .event-green { background: #188038; }
+    .event-purple { background: #673ab7; }
+    .event-gray { background: #6b7280; }
+    .event-large {
+      min-height: 76px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      background: #b3261e;
+    }
+
+    .sheet-page {
+      height: calc(100% - 82px);
+      display: grid;
+      grid-template-rows: 54px 1fr;
+      background: #fff;
+    }
+
+    .sheet-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 18px;
+      border-bottom: 1px solid #dfe5ec;
+      background: #f8faf9;
+      color: #4b5563;
+      font-size: 13px;
+    }
+
+    .formula-bar {
+      flex: 1;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border: 1px solid #d9e2dc;
+      border-radius: 5px;
+      background: #fff;
+      color: #5f6368;
+    }
+
+    .sheet-wrap {
+      padding: 30px 42px 36px;
+      background: #fbfcfb;
+    }
+
+    table.forecast {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: #fff;
+      box-shadow: 0 2px 12px rgba(30,41,59,0.08);
+      border: 1px solid #cfd8dc;
+    }
+
+    .forecast th,
+    .forecast td {
+      height: 54px;
+      border: 1px solid #d6dde4;
+      padding: 0 12px;
+      text-align: left;
+      font-size: 18px;
+      color: #1f2937;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .forecast th {
+      height: 48px;
+      color: #374151;
+      background: #eaf3ec;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .forecast .rep {
+      width: 170px;
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    .forecast .currency {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bad-cell {
+      color: #8c1d18 !important;
+      background: #fce8e6;
+      font-weight: 700;
+    }
+
+    .warn-cell {
+      color: #8a5100 !important;
+      background: #fff4ce;
+      font-weight: 700;
+    }
+
+    .good-cell {
+      color: #0f5132 !important;
+      background: #dff4e8;
+    }
+
+    .sum-row td {
+      height: 64px;
+      background: #f3f6f4;
+      font-weight: 800;
+    }
+
+    .sum-row .down {
+      color: #b42318;
+      background: #fce8e6;
+      font-size: 23px;
+    }
+
+    .sum-row .note-full {
+      white-space: normal;
+      line-height: 1.12;
+      font-size: 20px;
+    }
+
+    .tabs-stress.browser-bar {
+      height: 96px;
+    }
+
+    .tabs-stress .tabs {
+      height: 52px;
+    }
+
+    .tabs-stress .tab {
+      min-width: 154px;
+      max-width: 154px;
+      height: 43px;
+      padding: 0 8px;
+      align-items: center;
+      font-size: 10.5px;
+      line-height: 1.08;
+      white-space: normal;
+    }
+
+    .tabs-stress + .stress-board {
+      height: calc(100% - 96px);
+    }
+
+    .stress-board {
+      height: calc(100% - 82px);
+      position: relative;
+      background:
+        linear-gradient(180deg, #f9fafb, #eef1f5);
+    }
+
+    .mini-panel {
+      position: absolute;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #dbe1ea;
+      box-shadow: 0 14px 36px rgba(30,41,59,0.14);
+      overflow: hidden;
+    }
+
+    .mini-head {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      color: #475569;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .mini-body {
+      padding: 14px;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .mini-line {
+      height: 10px;
+      border-radius: 5px;
+      background: #cbd5e1;
+      margin-bottom: 9px;
+    }
+
+    .clock-frame {
+      background:
+        linear-gradient(rgba(30,35,45,0.10), rgba(30,35,45,0.18)),
+        linear-gradient(145deg, #dde2e9, #b7c0cc);
+    }
+
+    .clock-chaos {
+      position: absolute;
+      inset: 0;
+      filter: blur(1.2px) saturate(0.55);
+      opacity: 0.72;
+    }
+
+    .clock-focus {
+      position: absolute;
+      right: 70px;
+      top: 54px;
+      width: 520px;
+      height: 156px;
+      border-radius: 16px;
+      background: rgba(250, 251, 253, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.6);
+      box-shadow: 0 24px 70px rgba(25,33,46,0.3);
+      display: grid;
+      grid-template-columns: 1fr 128px;
+      align-items: center;
+      padding: 24px 28px;
+    }
+
+    .big-time {
+      font-size: 62px;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: #111827;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .battery {
+      justify-self: end;
+      display: grid;
+      gap: 10px;
+      color: #b42318;
+      font-size: 16px;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .battery-shell {
+      width: 88px;
+      height: 36px;
+      position: relative;
+      border: 3px solid #b42318;
+      border-radius: 8px;
+      animation: batteryPulse 1.25s ease-in-out infinite;
+    }
+
+    .battery-shell::after {
+      content: "";
+      position: absolute;
+      right: -10px;
+      top: 9px;
+      width: 7px;
+      height: 14px;
+      border-radius: 0 4px 4px 0;
+      background: #b42318;
+    }
+
+    .battery-fill {
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      bottom: 4px;
+      width: 10px;
+      border-radius: 3px;
+      background: #b42318;
+    }
+
+    @keyframes batteryPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.52; }
+    }
+
+    .final-frame {
+      filter: saturate(0.44) contrast(0.9) brightness(0.82);
+      background: #9aa1ad;
+    }
+
+    .final-chaos {
+      position: absolute;
+      inset: 0;
+      filter: blur(1.4px) saturate(0.5);
+      opacity: 0.9;
+    }
+
+    .final-vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(0,0,0,0.04), rgba(0,0,0,0.52) 82%),
+        linear-gradient(180deg, rgba(9,12,18,0.08), rgba(9,12,18,0.42));
+      z-index: 8;
+    }
+
+    .final-copy {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 122px;
+      z-index: 12;
+      color: #fff;
+      text-align: center;
+      opacity: var(--textOpacity, 0);
+      transform: translateY(calc(18px * (1 - var(--textOpacity, 0))));
+      will-change: opacity, transform;
+    }
+
+    .final-copy h1 {
+      margin: 0 0 16px;
+      font-size: 72px;
+      line-height: 1;
+      font-weight: 720;
+      letter-spacing: 0;
+      text-shadow: 0 8px 32px rgba(0,0,0,0.45);
+    }
+
+    .final-copy p {
+      margin: 0;
+      font-size: 36px;
+      font-weight: 520;
+      color: rgba(255,255,255,0.88);
+      text-shadow: 0 5px 24px rgba(0,0,0,0.48);
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 70;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255,255,255,0.1), transparent 30%),
+        rgba(7,10,16,0.7);
+      backdrop-filter: blur(8px);
+    }
+
+    .play-overlay.hidden {
+      display: none;
+    }
+
+    .play-card {
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+      color: #fff;
+    }
+
+    .play-button {
+      width: 112px;
+      height: 112px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      color: #111827;
+      background: rgba(255,255,255,0.94);
+      cursor: pointer;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+    }
+
+    .play-button::before {
+      content: "";
+      display: block;
+      margin-left: 8px;
+      width: 0;
+      height: 0;
+      border-top: 22px solid transparent;
+      border-bottom: 22px solid transparent;
+      border-left: 34px solid #111827;
+    }
+
+    .play-label {
+      font-size: 15px;
+      color: rgba(255,255,255,0.72);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .blur-1 { filter: blur(1px) saturate(0.7); }
+    .blur-2 { filter: blur(1.7px) saturate(0.62); }
+    .tilt-left { transform: rotate(-1.2deg); }
+    .tilt-right { transform: rotate(1deg); }
+  </style>
+</head>
+<body>
+  <main class="shell" aria-label="GrowMe cold open animation">
+    <div class="stage" id="stage">
+      <section class="frame active" id="frame-1" aria-hidden="false">
+        <div class="camera">
+          <div class="desktop">
+            <div class="menu-bar">
+              <div class="menu-left"><strong>Sarah's MacBook</strong><span>Finder</span><span>Chrome</span><span>Slides</span></div>
+              <div class="menu-right"><span>Wi-Fi</span><span>47%</span><strong>11:43 PM</strong></div>
+            </div>
+            <div class="window chrome soft tilt-left" style="left:110px; top:108px; width:980px; height:620px;">
+              <div class="browser-bar">
+                <div class="tabs">
+                  <div class="tab active-tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                  <div class="tab"><span class="favicon sheet"></span>Forecast Q4</div>
+                  <div class="tab"><span class="favicon cal"></span>Calendar</div>
+                </div>
+                <div class="address"><span class="toolbar-icon"></span><div class="address-pill">docs / meddic-training-draft-v7</div></div>
+              </div>
+              <div class="doc-page" style="height:460px; margin-top:22px; transform:scale(.82); transform-origin:top center;">
+                <h1>MEDDIC Training Plan</h1>
+                <div class="doc-line blue"></div><div class="doc-line mid"></div><div class="doc-line short"></div>
+                <h2>Day 1</h2><div class="doc-line green"></div><div class="doc-line mid"></div>
+              </div>
+            </div>
+            <div class="window soft tilt-right" style="left:900px; top:210px; width:820px; height:520px;">
+              <div class="window-top"><span class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></span><strong>Forecast Q4</strong></div>
+              <div class="sheet-wrap" style="padding:24px;">
+                <table class="forecast" style="font-size:13px;">
+                  <tr><th>Rep</th><th>Stage 2</th><th>Stage 3</th><th>Commit</th></tr>
+                  <tr><td class="rep">Marcus</td><td class="bad-cell">No metric</td><td>Champion?</td><td class="currency">$84k</td></tr>
+                  <tr><td class="rep">Priya</td><td>OK</td><td class="bad-cell">Slip risk</td><td class="currency">$112k</td></tr>
+                  <tr><td class="rep">Jen</td><td class="bad-cell">No owner</td><td class="bad-cell">Stalled</td><td class="currency">$69k</td></tr>
+                </table>
+              </div>
+            </div>
+            <div class="window blur-1" style="left:470px; top:590px; width:620px; height:330px;">
+              <div class="window-top"><span class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></span><strong>Slack - Priya</strong><span class="badge">3</span></div>
+              <div class="mini-body">did you finish the agenda yet? kickoff is monday 😬</div>
+            </div>
+            <div class="window blur-2" style="left:1280px; top:94px; width:520px; height:380px;">
+              <div class="window-top"><span class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></span><strong>Pre-MEDDIC Assessment</strong></div>
+              <div class="mini-body"><div class="mini-line"></div><div class="mini-line" style="width:70%"></div><div class="mini-line" style="width:86%"></div></div>
+            </div>
+            <div class="cursor" style="left:1110px; top:482px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-2" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window chrome" style="left:128px; top:74px; width:1664px; height:944px;">
+              <div class="browser-bar">
+                <div class="tabs">
+                  <div class="tab active-tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                  <div class="tab"><span class="favicon cal"></span>Calendar</div>
+                  <div class="tab"><span class="favicon slack"></span>Slack</div>
+                </div>
+                <div class="address"><span class="toolbar-icon"></span><div class="address-pill">docs / Sarah / MEDDIC Training - DRAFT v7</div><span class="toolbar-icon"></span></div>
+              </div>
+              <div class="doc-content">
+                <article class="doc-page">
+                  <h1>MEDDIC Training - DRAFT v7</h1>
+                  <div class="doc-line blue" style="width:84%"></div>
+                  <div class="doc-line" style="width:91%"></div>
+                  <div class="doc-line" style="width:66%"></div>
+                  <h2>Learning promise</h2>
+                  <p style="font-size:18px; line-height:1.55; color:#374151;">By Friday, managers will be able to coach reps to identify <span class="change">economic buyers</span>, quantify pain, and create a shared close plan before forecast calls.</p>
+                  <h2>Day 1 agenda</h2>
+                  <ul class="doc-list">
+                    <li>MEDDIC field guide: what changes in discovery</li>
+                    <li>Scorecard review using two current Miro opportunities</li>
+                    <li>Manager practice: inspect champion strength</li>
+                  </ul>
+                  <h2>Day 2 agenda</h2>
+                  <div class="doc-line green" style="width:48%"></div>
+                  <div class="doc-line" style="width:18%"></div>
+                </article>
+                <aside class="comments">
+                  <div class="comment"><strong>Priya R.</strong>what's the agenda for day 2??</div>
+                  <div class="comment"><strong>Marcus L.</strong>Can we add a real Stage 3 example before this goes out?</div>
+                  <div class="comment"><strong>Jen K.</strong>Need facilitator notes for managers. We cannot wing this Monday.</div>
+                  <div class="comment"><strong>Sarah</strong>Resolve after forecast review?</div>
+                </aside>
+              </div>
+            </div>
+            <div class="cursor" style="left:1494px; top:372px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-3" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window" style="left:108px; top:62px; width:1704px; height:966px;">
+              <div class="window-top" style="background:#d24726; color:#fff; border-bottom-color:#ad351c;">
+                <span class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></span>
+                <strong>MEDDIC Kickoff Slides</strong>
+              </div>
+              <div class="ppt-layout">
+                <div class="ppt-ribbon">
+                  <span class="ribbon-chip">Home</span><span class="ribbon-chip">Insert</span><span class="ribbon-chip">Design</span><span class="ribbon-chip">Transitions</span>
+                  <span style="margin-left:auto;">Saved 11:38 PM</span>
+                </div>
+                <div class="slide-thumbs">
+                  <div class="thumb"><span>1</span><div class="thumb-card"></div></div>
+                  <div class="thumb"><span>2</span><div class="thumb-card"></div></div>
+                  <div class="thumb"><span>3</span><div class="thumb-card"></div></div>
+                  <div class="thumb"><span>4</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>5</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>6</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>7</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>8</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>9</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>10</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>11</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>12</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>13</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>14</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>15</span><div class="thumb-card"></div></div>
+                  <div class="thumb placeholder"><span>16</span><div class="thumb-card"></div></div>
+                </div>
+                <div class="slide-workspace">
+                  <div class="slide-canvas">
+                    <h1>Coaching MEDDIC in live pipeline reviews</h1>
+                    <ul class="slide-bullets">
+                      <li>Start with the metric the buyer already cares about</li>
+                      <li>Separate champion enthusiasm from champion power</li>
+                      <li>When Stage 3 slips, managers should first ask <span class="unfinished"></span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="cursor" style="left:1230px; top:612px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-4" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window chrome" style="left:146px; top:72px; width:1628px; height:930px;">
+              <div class="browser-bar">
+                <div class="tabs">
+                  <div class="tab active-tab"><span class="favicon survey"></span>Pre-MEDDIC Training Assessment</div>
+                  <div class="tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                  <div class="tab"><span class="favicon sheet"></span>Forecast Q4</div>
+                </div>
+                <div class="address"><span class="toolbar-icon"></span><div class="address-pill">survey builder / pre-meddic-training-assessment</div><span class="toolbar-icon"></span></div>
+              </div>
+              <div class="survey-page">
+                <aside class="survey-side">
+                  <h3>Survey Builder</h3>
+                  <div class="side-item active-side">Questions</div>
+                  <div class="side-item">Logic</div>
+                  <div class="side-item">Collect responses</div>
+                  <div class="side-item">Analyze results</div>
+                </aside>
+                <section class="survey-builder">
+                  <div class="survey-title">Pre-MEDDIC Training Assessment</div>
+                  <div class="survey-subtitle">Draft questions for 40 reps before Monday kickoff.</div>
+                  <div class="question-card">
+                    <h4>1. In current opportunities, how often do you identify the economic buyer before Stage 3?</h4>
+                    <div class="option-row"><span class="option-pill">Never</span><span class="option-pill">Rarely</span><span class="option-pill">Sometimes</span><span class="option-pill">Often</span><span class="option-pill">Always</span></div>
+                  </div>
+                  <div class="question-card">
+                    <h4>2. How often do you attach a quantified business impact to customer pain?</h4>
+                    <div class="option-row"><span class="option-pill">Never</span><span class="option-pill">Rarely</span><span class="option-pill">Sometimes</span><span class="option-pill">Often</span><span class="option-pill">Always</span></div>
+                  </div>
+                  <div class="add-question"><span class="plus">+</span>add question</div>
+                </section>
+              </div>
+            </div>
+            <div class="cursor" style="left:1096px; top:548px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-5" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window" style="left:198px; top:80px; width:1524px; height:912px;">
+              <div class="window-top"><span class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></span><strong>Team chat</strong><span class="badge">4</span></div>
+              <div class="slack">
+                <aside class="slack-side">
+                  <h3>Miro Sales</h3>
+                  <div class="slack-channel"># forecast-review</div>
+                  <div class="slack-channel"># sales-enablement</div>
+                  <div class="slack-channel active-channel">Priya R.</div>
+                  <div class="slack-channel">Marcus L.</div>
+                  <div class="slack-channel">Jen K.</div>
+                  <div class="slack-channel">Tomás V.</div>
+                </aside>
+                <section class="slack-main">
+                  <header class="slack-header">
+                    <div class="slack-name">Priya R.</div>
+                    <div class="slack-time">Active 4 min ago</div>
+                  </header>
+                  <div class="messages">
+                    <div class="message">
+                      <div class="avatar amber">P</div>
+                      <div><div class="message-top">Priya R. <span class="message-time">10:18 PM</span></div><div class="message-copy">I added the discovery examples from Marcus. Still missing the day 2 agenda.</div></div>
+                    </div>
+                    <div class="message">
+                      <div class="avatar sarah">S</div>
+                      <div><div class="message-top">Sarah <span class="message-time">10:31 PM</span></div><div class="message-copy">I am trying to reconcile it with the forecast first. Stage 2 and 3 are a mess.</div></div>
+                    </div>
+                    <div class="message latest">
+                      <div class="avatar amber">P</div>
+                      <div><div class="message-top">Priya R. <span class="message-time">11:47 PM</span></div><div class="message-copy">did you finish the agenda yet? kickoff is monday 😬</div></div>
+                    </div>
+                  </div>
+                  <div class="typing"><div class="typing-bubble"><i></i><i></i><i></i></div><span>Sarah is typing</span></div>
+                </section>
+              </div>
+            </div>
+            <div class="cursor" style="left:1332px; top:883px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-6" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window chrome" style="left:126px; top:66px; width:1668px; height:958px;">
+              <div class="browser-bar">
+                <div class="tabs">
+                  <div class="tab active-tab"><span class="favicon cal"></span>Calendar</div>
+                  <div class="tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                  <div class="tab"><span class="favicon slack"></span>Slack</div>
+                </div>
+                <div class="address"><span class="toolbar-icon"></span><div class="address-pill">calendar / Sarah / Jun 5 - Jun 11</div><span class="toolbar-icon"></span></div>
+              </div>
+              <div class="calendar-page">
+                <div class="calendar-head">
+                  <div class="calendar-title">Jun 5 - 11</div>
+                  <div class="cal-controls"><span class="control">Today</span><span class="control">Week</span><span class="control">Sarah Young</span></div>
+                </div>
+                <div class="calendar-grid">
+                  <div></div>
+                  <div class="day-head today">Wed<strong>5</strong></div>
+                  <div class="day-head">Thu<strong>6</strong></div>
+                  <div class="day-head">Fri<strong>7</strong></div>
+                  <div class="day-head">Sat<strong>8</strong></div>
+                  <div class="day-head">Sun<strong>9</strong></div>
+                  <div class="day-head">Mon<strong>10</strong></div>
+                  <div class="day-head">Tue<strong>11</strong></div>
+                  <div class="time-label">8 AM</div><div class="cal-cell"><div class="cal-event">Forecast inspection</div></div><div class="cal-cell"><div class="cal-event event-gray">1:1 Marcus</div></div><div class="cal-cell"><div class="cal-event event-green">Pipeline standup</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event event-large">MEDDIC TRAINING KICKOFF - 40 reps</div></div><div class="cal-cell"><div class="cal-event">Post-kickoff review</div></div>
+                  <div class="time-label">9 AM</div><div class="cal-cell"><div class="cal-event event-purple">L&D sync</div></div><div class="cal-cell"><div class="cal-event">Recruiting panel</div></div><div class="cal-cell"><div class="cal-event event-red">Exec forecast</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event event-large" style="top:0; min-height:74px;">MEDDIC TRAINING KICKOFF - 40 reps</div></div><div class="cal-cell"></div>
+                  <div class="time-label">10 AM</div><div class="cal-cell"><div class="cal-event">Deal desk</div></div><div class="cal-cell"><div class="cal-event event-green">Manager huddle</div></div><div class="cal-cell"><div class="cal-event">Customer call</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event event-purple">Enablement retro</div></div>
+                  <div class="time-label">11 AM</div><div class="cal-cell"><div class="cal-event event-red">QBR prep</div></div><div class="cal-cell"><div class="cal-event">Team standup</div></div><div class="cal-cell"><div class="cal-event">Deal review</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event">Lunch with reps</div></div><div class="cal-cell"></div>
+                  <div class="time-label">12 PM</div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event event-gray">Candidate debrief</div></div><div class="cal-cell"><div class="cal-event event-red">Forecast cleanup</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event">Pipeline office hours</div></div>
+                  <div class="time-label">1 PM</div><div class="cal-cell"><div class="cal-event">Priya deck review</div></div><div class="cal-cell"><div class="cal-event event-purple">MEDDIC agenda</div></div><div class="cal-cell"><div class="cal-event">Board update</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event event-green">Role-play practice</div></div><div class="cal-cell"></div>
+                  <div class="time-label">2 PM</div><div class="cal-cell"><div class="cal-event event-green">AE coaching</div></div><div class="cal-cell"><div class="cal-event">Tomás 1:1</div></div><div class="cal-cell"><div class="cal-event event-red">Slip-risk review</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event">Hiring sync</div></div>
+                  <div class="time-label">3 PM</div><div class="cal-cell"><div class="cal-event">Customer escalation</div></div><div class="cal-cell"><div class="cal-event event-gray">Legal sync</div></div><div class="cal-cell"><div class="cal-event">Deck lock?</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event">Manager debrief</div></div><div class="cal-cell"></div>
+                  <div class="time-label">4 PM</div><div class="cal-cell"><div class="cal-event event-red">Forecast call</div></div><div class="cal-cell"><div class="cal-event">Slides review</div></div><div class="cal-cell"><div class="cal-event">Survey launch</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"><div class="cal-event event-gray">Admin catch-up</div></div>
+                  <div class="time-label">5 PM</div><div class="cal-cell"><div class="cal-event event-purple">Training content</div></div><div class="cal-cell"><div class="cal-event event-red">Forecast fixes</div></div><div class="cal-cell"><div class="cal-event">Prep notes</div></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div>
+                </div>
+              </div>
+            </div>
+            <div class="cursor" style="left:1398px; top:214px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-7" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window chrome" style="left:92px; top:64px; width:1736px; height:952px;">
+              <div class="browser-bar">
+                <div class="tabs">
+                  <div class="tab active-tab"><span class="favicon sheet"></span>Forecast Q4</div>
+                  <div class="tab"><span class="favicon sales"></span>Salesforce</div>
+                  <div class="tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                </div>
+                <div class="address"><span class="toolbar-icon"></span><div class="address-pill">sheets / sales / Forecast Q4 / MEDDIC inspection</div><span class="toolbar-icon"></span></div>
+              </div>
+              <div class="sheet-page">
+                <div class="sheet-tools"><strong>Forecast Q4</strong><span>File</span><span>Edit</span><span>View</span><span>Insert</span><div class="formula-bar">=SUM(F2:F9)  // commit down 18% from target</div></div>
+                <div class="sheet-wrap">
+                  <table class="forecast">
+                    <tr>
+                      <th class="rep">Rep</th>
+                      <th>Stage 1: Pain</th>
+                      <th>Stage 2: Metrics</th>
+                      <th>Stage 3: Economic Buyer</th>
+                      <th>Champion</th>
+                      <th class="currency">Commit</th>
+                      <th>Manager note</th>
+                    </tr>
+                    <tr>
+                      <td class="rep">Marcus Lee</td><td class="good-cell">Pain confirmed</td><td class="bad-cell">No quantified impact</td><td class="warn-cell">Buyer unverified</td><td>Rebecca C.</td><td class="currency">$124,000</td><td>Discovery gap</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Priya Raman</td><td>Ops pain</td><td class="bad-cell">Missing baseline</td><td class="bad-cell">No EB access</td><td>IT manager only</td><td class="currency">$96,000</td><td>Likely slip</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Jen Kim</td><td class="good-cell">Clear pain</td><td>$210k risk</td><td class="bad-cell">CFO unknown</td><td>Soft champion</td><td class="currency">$138,000</td><td>Power map missing</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Tomás Vega</td><td>Feature request</td><td class="bad-cell">No business metric</td><td class="bad-cell">Procurement only</td><td>Weak</td><td class="currency">$72,000</td><td>MEDDIC incomplete</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Aisha Carter</td><td>Cycle time</td><td class="warn-cell">Estimate only</td><td>VP Sales</td><td class="good-cell">Strong</td><td class="currency">$181,000</td><td>Needs proof</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Devin Shah</td><td class="good-cell">Retention risk</td><td>$340k exposure</td><td class="bad-cell">No meeting booked</td><td>Director CS</td><td class="currency">$155,000</td><td>EB gap</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Leah Brooks</td><td>Expansion</td><td class="bad-cell">Metric disputed</td><td class="warn-cell">CRO delegated</td><td>Manager</td><td class="currency">$88,000</td><td>Coach before call</td>
+                    </tr>
+                    <tr>
+                      <td class="rep">Noor Patel</td><td>Renewal pain</td><td class="bad-cell">No value calc</td><td class="bad-cell">Unknown</td><td>None</td><td class="currency">$62,000</td><td>High risk</td>
+                    </tr>
+                    <tr class="sum-row">
+                      <td colspan="5">Projected commit vs target</td>
+                      <td class="currency down">$916,000 ▼ 18%</td>
+                      <td class="down note-full">Stage 2 / Stage 3 gaps driving miss</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="cursor" style="left:1018px; top:452px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame" id="frame-8" aria-hidden="true">
+        <div class="camera">
+          <div class="desktop">
+            <div class="window chrome" style="left:74px; top:70px; width:1772px; height:938px;">
+              <div class="browser-bar tabs-stress">
+                <div class="tabs">
+                  <div class="tab active-tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                  <div class="tab"><span class="favicon slide"></span>Slides</div>
+                  <div class="tab"><span class="favicon survey"></span>SurveyMonkey</div>
+                  <div class="tab"><span class="favicon slack"></span>Slack</div>
+                  <div class="tab"><span class="favicon cal"></span>Calendar</div>
+                  <div class="tab"><span class="favicon sheet"></span>Forecast Q4</div>
+                  <div class="tab"><span class="favicon sales"></span>Salesforce</div>
+                  <div class="tab"><span class="favicon note"></span>Notion - L&D templates</div>
+                  <div class="tab"><span class="favicon mail"></span>Gmail (47)</div>
+                  <div class="tab"><span class="favicon web"></span>Glassdoor - sales training agencies</div>
+                  <div class="tab"><span class="favicon video"></span>YouTube - meddic training video</div>
+                </div>
+                <div class="address"><span class="toolbar-icon"></span><div class="address-pill">11 open tabs - Sarah / Monday kickoff</div><span class="badge">47</span></div>
+              </div>
+              <div class="stress-board">
+                <div class="mini-panel" style="left:48px; top:36px; width:520px; height:330px;">
+                  <div class="mini-head"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div>
+                  <div class="mini-body"><div class="mini-line" style="width:82%"></div><div class="mini-line" style="width:91%"></div><div class="mini-line" style="width:56%"></div><p>Comment open: what's the agenda for day 2??</p></div>
+                </div>
+                <div class="mini-panel" style="left:612px; top:28px; width:468px; height:280px;">
+                  <div class="mini-head"><span class="favicon slide"></span>Slides</div>
+                  <div class="mini-body"><div class="mini-line" style="width:74%"></div><div class="mini-line" style="width:42%"></div><p>4 slides done. 12 placeholders.</p></div>
+                </div>
+                <div class="mini-panel" style="left:1126px; top:34px; width:548px; height:332px;">
+                  <div class="mini-head"><span class="favicon sheet"></span>Forecast Q4</div>
+                  <div class="mini-body"><table class="forecast" style="box-shadow:none"><tr><th>Rep</th><th>Stage 2</th><th>Stage 3</th></tr><tr><td>Priya</td><td class="bad-cell">Missing</td><td class="bad-cell">No EB</td></tr><tr><td>Tomás</td><td class="bad-cell">No metric</td><td>Procurement</td></tr></table></div>
+                </div>
+                <div class="mini-panel" style="left:182px; top:424px; width:486px; height:282px;">
+                  <div class="mini-head"><span class="favicon slack"></span>Slack</div>
+                  <div class="mini-body"><p>11:47 PM - did you finish the agenda yet? kickoff is monday 😬</p><div class="typing-bubble"><i></i><i></i><i></i></div></div>
+                </div>
+                <div class="mini-panel" style="left:730px; top:372px; width:410px; height:244px;">
+                  <div class="mini-head"><span class="favicon cal"></span>Calendar</div>
+                  <div class="mini-body"><p style="color:#b3261e;font-weight:800;">MON 10: MEDDIC TRAINING KICKOFF - 40 reps</p><div class="mini-line"></div><div class="mini-line"></div></div>
+                </div>
+                <div class="mini-panel" style="left:1190px; top:430px; width:390px; height:230px;">
+                  <div class="mini-head"><span class="favicon mail"></span>Gmail (47)</div>
+                  <div class="mini-body"><div class="mini-line" style="width:93%"></div><div class="mini-line" style="width:78%"></div><p>Training vendor quotes, slide reviews, forecast escalations.</p></div>
+                </div>
+              </div>
+            </div>
+            <div class="cursor" style="left:1514px; top:134px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="frame clock-frame" id="frame-9" aria-hidden="true">
+        <div class="camera">
+          <div class="clock-chaos">
+            <div class="desktop">
+              <div class="window chrome soft" style="left:96px; top:126px; width:1040px; height:620px;"></div>
+              <div class="window soft" style="left:870px; top:220px; width:760px; height:480px;"></div>
+              <div class="window soft" style="left:420px; top:560px; width:620px; height:300px;"></div>
+            </div>
+          </div>
+          <div class="menu-bar" style="height:46px; font-size:15px;">
+            <div class="menu-left"><strong>Chrome</strong><span>File</span><span>Edit</span><span>View</span><span>Window</span></div>
+            <div class="menu-right"><span>Wi-Fi</span><span>Focus</span><span style="color:#b42318;font-weight:800;">Low Battery</span><strong>11:52 PM</strong></div>
+          </div>
+          <div class="clock-focus">
+            <div>
+              <div class="big-time">11:52 PM</div>
+              <div style="color:#6b7280; font-size:18px; margin-top:8px;">Wednesday - five days to kickoff</div>
+            </div>
+            <div class="battery">
+              <div class="battery-shell"><div class="battery-fill"></div></div>
+              <div>6%</div>
+            </div>
+          </div>
+          <div class="cursor" style="left:1428px; top:186px;"></div>
+        </div>
+      </section>
+
+      <section class="frame final-frame" id="frame-10" aria-hidden="true">
+        <div class="camera">
+          <div class="final-chaos">
+            <div class="desktop">
+              <div class="window chrome tilt-left" style="left:110px; top:108px; width:980px; height:620px;">
+                <div class="browser-bar"><div class="tabs"><div class="tab active-tab"><span class="favicon doc"></span>MEDDIC Training - DRAFT v7</div><div class="tab"><span class="favicon sheet"></span>Forecast Q4</div><div class="tab"><span class="favicon cal"></span>Calendar</div></div></div>
+              </div>
+              <div class="window tilt-right" style="left:900px; top:210px; width:820px; height:520px;">
+                <div class="window-top"><span class="traffic"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></span><strong>Forecast Q4</strong></div>
+                <div class="sheet-wrap" style="padding:24px;"><table class="forecast"><tr><th>Rep</th><th>Stage 2</th><th>Stage 3</th></tr><tr><td>Priya</td><td class="bad-cell">Missing</td><td class="bad-cell">No EB</td></tr><tr><td>Jen</td><td class="bad-cell">No owner</td><td>Stalled</td></tr></table></div>
+              </div>
+              <div class="window" style="left:470px; top:590px; width:620px; height:330px;">
+                <div class="window-top"><strong>Slack - Priya</strong><span class="badge">4</span></div>
+                <div class="mini-body">did you finish the agenda yet? kickoff is monday 😬</div>
+              </div>
+              <div class="window" style="left:1280px; top:94px; width:520px; height:380px;">
+                <div class="window-top"><strong>Calendar</strong></div>
+                <div class="mini-body"><p style="color:#b3261e;font-weight:800;">MEDDIC TRAINING KICKOFF - 40 reps</p><div class="mini-line"></div><div class="mini-line"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="final-vignette"></div>
+          <div class="final-copy">
+            <h1>Sarah, sales leader at Miro</h1>
+            <p>5 days to kickoff. 40 reps. No program.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="play-overlay" id="playOverlay">
+        <div class="play-card">
+          <button class="play-button" id="playButton" type="button" aria-label="Play cold open"></button>
+          <div class="play-label">Play 25-second cold open</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const timeline = [
+      { id: "frame-1", start: 0, end: 2, from: { x: -8, y: -5, z: 1.006 }, to: { x: 12, y: 8, z: 1.023 } },
+      { id: "frame-2", start: 2, end: 4, from: { x: 10, y: 4, z: 1.01 }, to: { x: -10, y: -4, z: 1.028 } },
+      { id: "frame-3", start: 4, end: 6, from: { x: -10, y: 8, z: 1.008 }, to: { x: 8, y: -8, z: 1.025 } },
+      { id: "frame-4", start: 6, end: 8, from: { x: 8, y: -3, z: 1.008 }, to: { x: -9, y: 6, z: 1.026 } },
+      { id: "frame-5", start: 8, end: 10, from: { x: -8, y: 0, z: 1.006 }, to: { x: 8, y: -5, z: 1.022 } },
+      { id: "frame-6", start: 10, end: 12, from: { x: 0, y: 8, z: 1.006 }, to: { x: -12, y: -5, z: 1.024 } },
+      { id: "frame-7", start: 12, end: 15, from: { x: -4, y: 3, z: 1.004 }, to: { x: 6, y: -8, z: 1.025 } },
+      { id: "frame-8", start: 15, end: 17, from: { x: 9, y: -2, z: 1.006 }, to: { x: -10, y: 4, z: 1.024 } },
+      { id: "frame-9", start: 17, end: 20, from: { x: 0, y: 0, z: 1.006 }, to: { x: -14, y: 8, z: 1.026 } },
+      { id: "frame-10", start: 20, end: 25, from: { x: -8, y: 2, z: 1.006 }, to: { x: 8, y: -4, z: 1.02 } }
+    ];
+
+    const totalSeconds = 25;
+    const frames = new Map(timeline.map((item) => [item.id, document.getElementById(item.id)]));
+    const playButton = document.getElementById("playButton");
+    const playOverlay = document.getElementById("playOverlay");
+    let activeId = "frame-1";
+    let startedAt = 0;
+    let rafId = 0;
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function lerp(a, b, p) {
+      return a + (b - a) * p;
+    }
+
+    function easeInOut(p) {
+      return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    }
+
+    function setActive(id) {
+      if (id === activeId) return;
+      frames.forEach((frame, frameId) => {
+        const isActive = frameId === id;
+        frame.classList.toggle("active", isActive);
+        frame.setAttribute("aria-hidden", String(!isActive));
+      });
+      activeId = id;
+    }
+
+    function currentFrame(seconds) {
+      return timeline.find((item) => seconds >= item.start && seconds < item.end) || timeline[timeline.length - 1];
+    }
+
+    function render(now) {
+      const seconds = clamp((now - startedAt) / 1000, 0, totalSeconds);
+      const item = currentFrame(seconds);
+      setActive(item.id);
+
+      const frame = frames.get(item.id);
+      const camera = frame.querySelector(".camera");
+      const duration = item.end - item.start;
+      const progress = clamp((seconds - item.start) / duration, 0, 1);
+      const eased = easeInOut(progress);
+      const x = lerp(item.from.x, item.to.x, eased);
+      const y = lerp(item.from.y, item.to.y, eased);
+      const z = lerp(item.from.z, item.to.z, eased);
+
+      frame.style.setProperty("--progress", progress.toFixed(4));
+      camera.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${z})`;
+
+      if (item.id === "frame-10") {
+        const textOpacity = clamp((progress - 0.16) / 0.28, 0, 1);
+        frame.style.setProperty("--textOpacity", textOpacity.toFixed(4));
+      }
+
+      if (seconds < totalSeconds) {
+        rafId = requestAnimationFrame(render);
+      } else {
+        const finalFrame = frames.get("frame-10");
+        setActive("frame-10");
+        finalFrame.style.setProperty("--progress", "1");
+        finalFrame.style.setProperty("--textOpacity", "1");
+        finalFrame.querySelector(".camera").style.transform = "translate3d(8px, -4px, 0) scale(1.02)";
+      }
+    }
+
+    playButton.addEventListener("click", () => {
+      cancelAnimationFrame(rafId);
+      playOverlay.classList.add("hidden");
+      frames.forEach((frame) => {
+        frame.style.removeProperty("--textOpacity");
+        const camera = frame.querySelector(".camera");
+        if (camera) camera.style.transform = "";
+      });
+      setActive("frame-1");
+      startedAt = performance.now();
+      rafId = requestAnimationFrame(render);
+    });
+  </script>
+</body>
+</html>

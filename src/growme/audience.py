@@ -1,4 +1,4 @@
-"""Build audience_description for WizardInputs from structured UI fields."""
+"""Build audience descriptions from structured UI fields."""
 
 from __future__ import annotations
 

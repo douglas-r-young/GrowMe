@@ -12,9 +12,10 @@ SNAPSHOT_SYSTEM = (
 )
 
 
-def run(company_url: str) -> str:
+def run(company_url: str, *, extra_urls: list[str] | None = None) -> str:
     """Returns markdown company snapshot. Hits Apify website-content-crawler live."""
-    pages = run_website_crawler([_https(company_url)], max_pages=3)
+    urls = [_https(company_url)] + [_https(u) for u in (extra_urls or []) if u]
+    pages = run_website_crawler(urls, max_pages=3)
     blob = "\n\n".join(_extract_text(p) for p in pages if _extract_text(p))[:12_000]
     return complete(
         role="research_synth",

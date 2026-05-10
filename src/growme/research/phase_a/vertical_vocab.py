@@ -26,8 +26,9 @@ VOCAB_SYSTEM = (
 )
 
 
-def run(company_url: str) -> list[str]:
-    pages = run_website_crawler([_https(company_url)], max_pages=4)
+def run(company_url: str, *, extra_urls: list[str] | None = None) -> list[str]:
+    urls = [_https(company_url)] + [_https(u) for u in (extra_urls or []) if u]
+    pages = run_website_crawler(urls, max_pages=4)
     blob = "\n\n".join(_extract_text(p) for p in pages)[:10_000]
     vocab = complete_json(
         role="research_extract",

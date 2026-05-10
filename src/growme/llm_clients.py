@@ -127,11 +127,22 @@ def complete_json(
         try:
             return schema.model_validate_json(stripped)
         except Exception as e:
+            # Tier 1: tolerate raw control chars (\n, \t, \r) inside string values.
+            # Llama-class models routinely emit literal newlines inside long markdown
+            # fields. json.loads(..., strict=False) accepts them; pydantic's
+            # model_validate (no _json suffix) takes a Python dict, bypassing
+            # pydantic-core's strict JSON parser.
+            try:
+                data = json.loads(stripped, strict=False)
+                return schema.model_validate(data)
+            except Exception:
+                pass
+            # Tier 2: structural repair (missing commas, unbalanced braces).
             try:
                 repaired = json_repair.repair_json(stripped)
                 return schema.model_validate_json(repaired)
-            except Exception:
-                last_err = str(e)
+            except Exception as e2:
+                last_err = f"{e} | repair: {e2}"
     raise ValueError(f"complete_json failed after {max_retries+1} attempts: {last_err}")
 
 

@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Behavior-change training programs from a single intake."
 requires-python = ">=3.11"
 dependencies = [
-    "streamlit>=1.40",
+    "fastapi>=0.124",
+    "uvicorn[standard]>=0.30",
     "langgraph>=0.2.55",
     "langchain>=0.3",
     "langchain-openai>=0.2",
