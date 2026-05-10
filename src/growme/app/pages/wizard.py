@@ -150,8 +150,9 @@ def _step_build():
     from pathlib import Path
 
     from growme.assessment.generator import generate_program_assessment
-    from growme.decks.builder import build_deck
-    from growme.decks.llm import gen_facilitator_guide, gen_slide_bodies
+    from growme.decks.builder import build_deck, collect_image_prompts
+    from growme.decks.images import generate_deck_images
+    from growme.decks.llm import gen_facilitator_guide, plan_deck
     from growme.decks.pptx import export_pptx
     from growme.decks.render import render_deck
     from growme.sessions.plan_node import run as run_plan
@@ -189,17 +190,21 @@ def _step_build():
                         from growme.assessment.generator import generate_program_assessment_offline
                         assessment = generate_program_assessment_offline(inputs.selected_behavior_ids)
                     state.update("program_assessment", assessment)
-                    s.write("Slide bodies + facilitator guide...")
-                    slide_bodies = gen_slide_bodies(plan, enriched)
-                    guide_md = gen_facilitator_guide(plan, enriched)
+                    s.write("Planning deck (gpt-5.1, ~30s)...")
+                    deck_plan = plan_deck(plan, enriched)
+                    s.write(f"Generating {len(collect_image_prompts(deck_plan))} hero images...")
+                    image_paths = generate_deck_images(collect_image_prompts(deck_plan))
+                    s.write("Facilitator guide...")
+                    guide_md = gen_facilitator_guide(plan, enriched, deck_plan=deck_plan)
                     s.write("Composing deck + exporting .pptx...")
                     base_url = os.environ.get("STREAMLIT_LOCAL_URL", "http://localhost:8501")
                     pre_qr_url = f"{base_url}/?assessment={session_uuid}&kind=pre"
                     post_qr_url = f"{base_url}/?assessment={session_uuid}&kind=post"
                     d = build_deck(
-                        plan=plan, enriched=enriched, assessment=assessment,
+                        plan=plan, enriched=enriched, deck_plan=deck_plan,
                         pre_qr_url=pre_qr_url, post_qr_url=post_qr_url,
-                        slide_bodies=slide_bodies, facilitator_guide_md=guide_md,
+                        facilitator_guide_md=guide_md,
+                        image_paths=image_paths,
                         company_alias=inputs.company_alias,
                     )
                     pptx_path = session_dir / "deck.pptx"

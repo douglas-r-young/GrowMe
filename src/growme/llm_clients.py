@@ -56,7 +56,8 @@ ROLE_TO_MODEL: dict[str, str] = {
     "research_synth":   _FAST_LLAMA,
     "design_doc":       _FAST_LLAMA,
     "session_plan":     "openai/gpt-4o",
-    "materials":        "openai/gpt-4o",
+    "materials":        "openai/gpt-5.1",
+    "deck_planner":     "openai/gpt-5.1",
     "nudges":           _FAST_SMALL,
     "delta_report":     "openai/gpt-4o",
 }

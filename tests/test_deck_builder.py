@@ -1,6 +1,6 @@
-"""build_deck composes slides in the right order with QRs in the right spots."""
-from growme.assessment.generator import generate_program_assessment_offline
-from growme.decks.builder import build_deck
+"""build_deck composes slides from a DeckPlan with QR slides in the right spots."""
+from growme.decks.builder import build_deck, collect_image_prompts
+from growme.decks.llm import DeckPlan, PlannedSlide
 from growme.schemas import (
     AgendaBlock,
     BaseCompanyResearch,
@@ -45,34 +45,67 @@ def _plan():
     )
 
 
-def test_build_deck_has_pre_qr_and_post_qr_slides_in_order():
+def _planned(layout, blocks):
+    return PlannedSlide(layout=layout, blocks=blocks, speaker_notes="x" * 100)
+
+
+def _deck_plan() -> DeckPlan:
+    """Mirrors STORY_ARC_SKELETON: cover, pre-qr, why, then 3×{div,teach,ex,act}, integration, post-qr, close."""
+    slides = [
+        _planned("cover", {"eyebrow": "GrowMe", "title": "Photon DB · PIC", "subtitle": "lo", "image_prompt": "abstract"}),
+        _planned("poll_qr", {}),
+        _planned("teach", {"eyebrow": "Why", "title": "Why this session", "bullets": ["a", "b"], "citation": "src"}),
+    ]
+    for i, name in enumerate(["Quantify pain", "Capabilities → outcomes", "Differentiate"], start=1):
+        slides.append(_planned("section_divider", {"number": f"0{i}", "behavior_name": name, "promise": "p", "image_prompt": f"art {i}"}))
+        slides.append(_planned("teach", {"eyebrow": "SPIN", "title": name, "bullets": ["a", "b", "c"], "citation": "src"}))
+        slides.append(_planned("example", {"title": "Ex", "before_body": "before text", "after_body": "after text"}))
+        slides.append(_planned("activity", {"eyebrow": "Try it · 5 min", "title": "Activity", "prompt": "do this", "sub_prompts": ["x", "y"], "timer_hint": "5 min"}))
+    slides.append(_planned("activity", {"eyebrow": "Integration", "title": "Combine all three", "prompt": "role-play", "sub_prompts": ["a"], "timer_hint": "10 min"}))
+    slides.append(_planned("poll_qr", {}))
+    slides.append(_planned("close", {"title": "Thanks", "commitment_recap": "you committed", "next_step": "nudge next week"}))
+    return DeckPlan(slides=slides)
+
+
+def test_build_deck_composes_planned_slides_and_overrides_qr_urls():
     ec = _enriched()
     plan = _plan()
-    assessment = generate_program_assessment_offline(
-        ["pic_pbo_quantify_pain", "pic_rc_capabilities_outcomes", "pic_diff_differentiate"]
-    )
+    dp = _deck_plan()
+
     deck = build_deck(
         plan=plan,
         enriched=ec,
-        assessment=assessment,
+        deck_plan=dp,
         pre_qr_url="http://localhost:8501/?assessment=u&kind=pre",
         post_qr_url="http://localhost:8501/?assessment=u&kind=post",
-        slide_bodies=[("Quantify pain", "body"), ("Capabilities → outcomes", "body"),
-                      ("Differentiate", "body"), ("Integration", "body")],
         facilitator_guide_md="# Guide",
+        image_paths=[None, None, None, None],  # cover + 3 dividers
     )
-    kinds = [s.kind for s in deck.slides]
-    assert kinds[0] == "title"
-    assert "poll_qr" in kinds[:3]                    # pre QR appears near start
-    assert "poll_qr" in kinds[-3:]                   # post QR appears near end
-    assert kinds[-1] == "close"
-    pre_qr = next(s for s in deck.slides if s.kind == "poll_qr" and s.qr_url and "kind=pre" in s.qr_url)
-    post_qr = next(s for s in deck.slides if s.kind == "poll_qr" and s.qr_url and "kind=post" in s.qr_url)
-    assert pre_qr is not None and post_qr is not None
-    assert len(pre_qr.body_md) <= 120
-    assert len(post_qr.body_md) <= 120
-    assert pre_qr.body_md  # non-empty
-    assert post_qr.body_md
-    assert deck.pre_qr_url == "http://localhost:8501/?assessment=u&kind=pre"
-    assert deck.post_qr_url == "http://localhost:8501/?assessment=u&kind=post"
-    assert deck.pptx_path is None  # not exported yet
+
+    layouts = [s.layout for s in deck.slides]
+    assert layouts[0] == "cover"
+    assert layouts[1] == "poll_qr"
+    assert layouts[-1] == "close"
+    assert layouts[-2] == "poll_qr"
+
+    pre_qr = next(s for s in deck.slides if s.layout == "poll_qr" and "kind=pre" in (s.qr_url or ""))
+    post_qr = next(s for s in deck.slides if s.layout == "poll_qr" and "kind=post" in (s.qr_url or ""))
+    assert pre_qr.qr_caption and post_qr.qr_caption
+    assert pre_qr.body_md and post_qr.body_md
+    assert deck.pre_qr_url.endswith("kind=pre")
+    assert deck.post_qr_url.endswith("kind=post")
+    assert deck.pptx_path is None
+
+    # Every non-QR slide must carry speaker notes from the planner.
+    for s in deck.slides:
+        if s.layout != "poll_qr":
+            assert len(s.speaker_notes) >= 80
+
+
+def test_collect_image_prompts_returns_cover_plus_dividers_in_order():
+    dp = _deck_plan()
+    prompts = collect_image_prompts(dp)
+    assert len(prompts) == 4  # cover + 3 section_dividers
+    assert prompts[0] == "abstract"
+    assert prompts[1] == "art 1"
+    assert prompts[3] == "art 3"

@@ -9,6 +9,7 @@ def test_role_map_covers_all_roles():
         "design_doc",
         "session_plan",
         "materials",
+        "deck_planner",
         "nudges",
         "delta_report",
     }

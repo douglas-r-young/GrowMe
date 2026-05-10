@@ -106,13 +106,33 @@ class SessionPlan(BaseModel):
 
 SlideKind = Literal["title", "content", "poll_qr", "close"]
 
+# New: layout-driven rendering. `kind` kept for backwards compat with tests/render.
+SlideLayout = Literal[
+    "cover",
+    "section_divider",
+    "teach",
+    "example",
+    "activity",
+    "stat",
+    "poll_qr",
+    "close",
+]
+
 
 class Slide(BaseModel):
     title: str
-    body_md: str
+    body_md: str = ""
     kind: SlideKind = "content"
     qr_url: str | None = None        # only on kind="poll_qr"
     qr_caption: str | None = None    # e.g. "Scan to take pre-assessment"
+
+    # Layout-driven fields (Phase 9.5)
+    layout: SlideLayout = "teach"
+    # `blocks` carries layout-specific content. Values may be str or list[str].
+    # See layouts.py for the placeholder contract per layout.
+    blocks: dict[str, object] = Field(default_factory=dict)
+    speaker_notes: str = ""
+    image_path: str | None = None    # local PNG path for cover/section_divider
 
 
 class SessionDeck(BaseModel):
