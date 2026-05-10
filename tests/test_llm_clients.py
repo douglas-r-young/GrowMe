@@ -49,3 +49,20 @@ def test_complete_json_passes_through_valid_output(monkeypatch):
     monkeypatch.setattr(llm_clients, "complete", lambda *a, **kw: '{"terms": ["x", "y"]}')
     out = llm_clients.complete_json(role="research_extract", system="", user="", schema=M)
     assert out.terms == ["x", "y"]
+
+
+def test_complete_json_tolerates_raw_newlines_in_strings(monkeypatch):
+    """Llama-class models often emit literal newlines inside long markdown fields.
+
+    Pydantic-core's strict JSON parser rejects these; we fall back to
+    json.loads(strict=False) before retrying the LLM. Regression for the
+    DesignDoc generation failure observed 2026-05-09.
+    """
+    class M(BaseModel):
+        body_md: str
+
+    raw = '{"body_md": "## Heading\n\nParagraph one.\n\nParagraph two."}'
+    monkeypatch.setattr(llm_clients, "complete", lambda *a, **kw: raw)
+    out = llm_clients.complete_json(role="design_doc", system="", user="", schema=M)
+    assert out.body_md.startswith("## Heading")
+    assert "Paragraph two." in out.body_md

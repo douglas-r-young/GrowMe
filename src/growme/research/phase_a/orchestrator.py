@@ -13,22 +13,31 @@ from growme.research.phase_a import (
 from growme.schemas import BaseCompanyResearch
 
 
-def run(company_url: str, company_alias: str, g2_product_url: str | None = None) -> BaseCompanyResearch:
+def run(
+    company_url: str,
+    company_alias: str,
+    g2_product_url: str | None = None,
+    *,
+    extra_urls: list[str] | None = None,
+) -> BaseCompanyResearch:
     """Parallel execution of all 4 Phase A branches.
 
     g2_product_url may be None; if so, customer_voice is skipped (left empty).
+    extra_urls (e.g. facilitator-supplied reference docs) are crawled alongside
+    the primary company_url for snapshot and vocab extraction.
     """
+    extras = list(extra_urls or [])
     tasks = {
-        "snapshot": (company_snapshot.run, (company_url,)),
-        "vocab":    (vertical_vocab.run, (company_url,)),
-        "competitors": (named_competitors.run, (company_alias, company_url)),
+        "snapshot": (company_snapshot.run, (company_url,), {"extra_urls": extras}),
+        "vocab":    (vertical_vocab.run, (company_url,), {"extra_urls": extras}),
+        "competitors": (named_competitors.run, (company_alias, company_url), {}),
     }
     if g2_product_url:
-        tasks["voice"] = (customer_voice.run, (g2_product_url,))
+        tasks["voice"] = (customer_voice.run, (g2_product_url,), {})
 
     results: dict[str, object] = {}
     with ThreadPoolExecutor(max_workers=len(tasks)) as ex:
-        future_to_key = {ex.submit(fn, *args): key for key, (fn, args) in tasks.items()}
+        future_to_key = {ex.submit(fn, *args, **kwargs): key for key, (fn, args, kwargs) in tasks.items()}
         for fut in as_completed(future_to_key):
             key = future_to_key[fut]
             try:

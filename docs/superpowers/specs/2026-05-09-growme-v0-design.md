@@ -1,6 +1,14 @@
 # GrowMe V0 — Design Spec
 
-**Status**: design (post-pivot, alongside `docs/superpowers/plans/2026-05-09-growme-v0.md`)
+> **⚠️ SUPERSEDED (2026-05-09 evening).** The Streamlit-native UI described in this
+> spec has been replaced by a FastAPI facade (`src/growme/api/`) + Vite/React
+> frontend (`frontend/`). The behavior-change pipeline (research → design doc →
+> session plan → deck → assessment → nudges → delta) is unchanged; the UI is
+> not. Treat sections describing Streamlit pages, `streamlit_app.py`, or the
+> Miro-era pivot rationale as historical context only. The current entry points
+> are `src/growme/api/app.py` (HTTP) and `frontend/src/App.tsx` (UI).
+
+**Status**: SUPERSEDED — kept for historical reference
 **Date**: 2026-05-09
 **Scope**: Hackathon V0, end-to-end thin slice, solo, ~24 hours
 **Demo persona**: Linda, sales manager at "Photon DB" (a disguised Neon)
