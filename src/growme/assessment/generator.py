@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from growme.behavior_menu import BEHAVIOR_MENU
 from growme.llm_clients import complete_json
+from growme.pedagogy import ASSESSMENT_PRINCIPLES
 from growme.schemas import (
     EnrichedContext,
     FrequencyQuestion,
@@ -25,7 +26,7 @@ class _LLMOut(BaseModel):
     commitment_options: list[str] = Field(min_length=4, max_length=5)
 
 
-ASSESSMENT_SYSTEM = """\
+ASSESSMENT_SYSTEM = f"""\
 You write a short pre/post assessment for a sales-skills training program.
 
 Inputs: three behaviors (name + description) and a list of supporting proof
@@ -37,7 +38,11 @@ Output strict JSON with exactly two fields:
     the rep does the behavior in their typical week ("How often do you …?").
     Do NOT include answer options — those are appended downstream.
   commitment_options: list of 4-5 short, concrete actions a rep could pledge to
-    take in the next 7 days. Ground each in the proof points where possible.
+    take in the next 7 days. Each MUST use "When [trigger], I will [action]" form
+    (Gollwitzer implementation intentions). Ground each in the proof points where
+    possible.
+
+{ASSESSMENT_PRINCIPLES}
 """
 
 
@@ -83,10 +88,10 @@ def generate_program_assessment_offline(behavior_ids: list[str]) -> ProgramAsses
     return ProgramAssessment(
         pre_questions=questions,
         commitment_options=[
-            "On 3 calls this week, ask 'how do you measure that today?'",
-            "Pre-write outcome statements for top 3 capabilities I pitch",
-            "Always name the competitor first in next 5 calls",
-            "Memorize 2 proof points per top competitor",
+            "When my next discovery call starts, I will ask 'how do you measure that today?' before any capability pitch.",
+            "When I open a new opportunity in Salesforce, I will pre-write the outcome statement before adding the next capability.",
+            "When a prospect mentions a competitor on my next 5 calls, I will name our differentiator before they finish framing.",
+            "When my Tuesday demo ends, I will log 2 proof points against the top competitor in the deal record.",
         ],
     )
 

@@ -12,6 +12,8 @@ def test_role_map_covers_all_roles():
         "deck_planner",
         "nudges",
         "delta_report",
+        "manager_briefing",   # Phase β: 1:1 prompt-sheet generation
+        "deck_auditor",       # Phase γ: anti-slop checklist pass on deck plan
     }
 
 

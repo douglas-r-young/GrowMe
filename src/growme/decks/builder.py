@@ -28,6 +28,7 @@ def build_deck(
     pre_qr_url: str,
     post_qr_url: str,
     facilitator_guide_md: str,
+    manager_briefing_md: str = "",
     image_paths: list[Path | None] | None = None,
     company_alias: str = "",
 ) -> SessionDeck:
@@ -104,13 +105,21 @@ def build_deck(
             else "content"
         )
 
+        # Example pull quotes are facilitator one-liners; they live in speaker
+        # notes (the renderer no longer puts them on the slide).
+        notes = ps.speaker_notes
+        if layout == "example":
+            pq = (blocks.get("pull_quote") or "").strip()
+            if pq:
+                notes = f"{notes}\n\nPULL-QUOTE CLOSE: “{pq}”"
+
         slides.append(Slide(
             title=str(title_for_slide),
             body_md=str(blocks.get("subtitle") or blocks.get("promise") or blocks.get("prompt") or ""),
             kind=kind_compat,
             layout=layout,
             blocks=blocks,
-            speaker_notes=ps.speaker_notes,
+            speaker_notes=notes,
             image_path=image_path,
         ))
 
@@ -120,6 +129,7 @@ def build_deck(
         behavior_ids=[bc.behavior_id for bc in enriched.per_behavior],
         slides=slides,
         facilitator_guide_md=facilitator_guide_md,
+        manager_briefing_md=manager_briefing_md,
         pptx_path=None,
         pre_qr_url=pre_qr_url,
         post_qr_url=post_qr_url,

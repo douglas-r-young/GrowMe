@@ -60,10 +60,65 @@ def test_session_plan_integration_session_allows_no_behavior_id():
         behavior_id=None,
         learning_objective="Combine all three behaviors in a deal motion",
         agenda=[
-            AgendaBlock(name="Opening hook", duration_min=5, description="..."),
+            AgendaBlock(name="Opening hook", duration_min=5, description="...", bucket="story"),
+            AgendaBlock(name="Teach", duration_min=10, description="...", bucket="framework"),
+            AgendaBlock(name="Discuss", duration_min=12, description="...", bucket="discussion"),
+            AgendaBlock(name="Practice", duration_min=15, description="...", bucket="activity"),
+            AgendaBlock(name="Close", duration_min=10, description="...", bucket="activity"),
+            AgendaBlock(name="Buffer", duration_min=8, description="Breathing room.", bucket="buffer"),
         ],
     )
     assert plan.behavior_id is None
+    assert sum(b.duration_min for b in plan.agenda) == 60
+
+
+def test_session_plan_rejects_total_outside_55_to_65():
+    with pytest.raises(ValidationError, match="55-65"):
+        SessionPlan(
+            session_number=1,
+            title="Tiny",
+            behavior_id=None,
+            learning_objective="x" * 30,
+            agenda=[
+                AgendaBlock(name="Opening", duration_min=5, description="...", bucket="story"),
+                AgendaBlock(name="Buffer", duration_min=10, description="...", bucket="buffer"),
+            ],
+        )
+
+
+def test_session_plan_rejects_framework_over_30_percent():
+    with pytest.raises(ValidationError, match="Framework time ratio"):
+        SessionPlan(
+            session_number=1,
+            title="Lecture",
+            behavior_id=None,
+            learning_objective="x" * 30,
+            agenda=[
+                AgendaBlock(name="Open", duration_min=5, description="...", bucket="story"),
+                AgendaBlock(name="Teach1", duration_min=10, description="...", bucket="framework"),
+                AgendaBlock(name="Teach2", duration_min=10, description="...", bucket="framework"),
+                AgendaBlock(name="Practice", duration_min=15, description="...", bucket="activity"),
+                AgendaBlock(name="Close", duration_min=12, description="...", bucket="activity"),
+                AgendaBlock(name="Buffer", duration_min=8, description="...", bucket="buffer"),
+            ],
+        )
+
+
+def test_session_plan_rejects_missing_buffer():
+    with pytest.raises(ValidationError, match="buffer"):
+        SessionPlan(
+            session_number=1,
+            title="No buffer",
+            behavior_id=None,
+            learning_objective="x" * 30,
+            agenda=[
+                AgendaBlock(name="Open", duration_min=5, description="...", bucket="story"),
+                AgendaBlock(name="Teach", duration_min=12, description="...", bucket="framework"),
+                AgendaBlock(name="Discuss", duration_min=15, description="...", bucket="discussion"),
+                AgendaBlock(name="Practice", duration_min=18, description="...", bucket="activity"),
+                AgendaBlock(name="Close", duration_min=10, description="...", bucket="activity"),
+            ],
+        )
 
 
 def test_slide_poll_qr_carries_qr_url():
@@ -137,6 +192,38 @@ def test_assessment_response_post_carries_commitment():
         learner_name="Sam",
         kind="post",
         frequency_answers={"a": "Often"},
-        commitment="Try this on 3 calls this week",
+        commitment="When pipeline review starts, I will state the EB name on my top 3 deals",
     )
-    assert r.commitment == "Try this on 3 calls this week"
+    assert r.commitment is not None
+    assert r.commitment.trigger == "pipeline review starts"
+    assert "EB name" in r.commitment.action
+    assert r.commitment.render().startswith("When ")
+
+
+def test_assessment_response_rejects_non_implementation_intention_commitment():
+    with pytest.raises(ValidationError, match="implementation intention"):
+        AssessmentResponse(
+            session_uuid="abc",
+            learner_id="L1",
+            learner_name="Sam",
+            kind="post",
+            frequency_answers={"a": "Often"},
+            commitment="Try this on 3 calls this week",
+        )
+
+
+def test_program_assessment_rejects_non_implementation_intention_options():
+    with pytest.raises(ValidationError, match="implementation intentions"):
+        ProgramAssessment(
+            pre_questions=[
+                FrequencyQuestion(behavior_id="a", prompt="x"),
+                FrequencyQuestion(behavior_id="b", prompt="y"),
+                FrequencyQuestion(behavior_id="c", prompt="z"),
+            ],
+            commitment_options=[
+                "Just try harder",
+                "When pipeline review starts, I will state the EB",
+                "When my Tuesday demo ends, I'll log 3 budget questions",
+                "Whenever I remember, I will quantify pain",
+            ],
+        )

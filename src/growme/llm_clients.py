@@ -52,14 +52,16 @@ _FAST_SMALL = _fast_small_model()
 
 # Role -> model id (LiteLLM format: provider/model)
 ROLE_TO_MODEL: dict[str, str] = {
-    "research_extract": _FAST_SMALL,
-    "research_synth":   _FAST_LLAMA,
-    "design_doc":       _FAST_LLAMA,
-    "session_plan":     "openai/gpt-4o",
-    "materials":        "openai/gpt-5.1",
-    "deck_planner":     "openai/gpt-5.1",
-    "nudges":           _FAST_SMALL,
-    "delta_report":     "openai/gpt-4o",
+    "research_extract":  _FAST_SMALL,
+    "research_synth":    _FAST_LLAMA,
+    "design_doc":        _FAST_LLAMA,
+    "session_plan":      "openai/gpt-4o",
+    "materials":         "openai/gpt-5.1",
+    "deck_planner":      "openai/gpt-5.1",
+    "nudges":            _FAST_SMALL,
+    "delta_report":      "openai/gpt-4o",
+    "manager_briefing":  _FAST_LLAMA,   # Phase β: 1:1 prompts — collegial tone, less reasoning than deck
+    "deck_auditor":      _FAST_LLAMA,   # Phase γ: anti-slop check on deck plan — cheap pass
 }
 
 

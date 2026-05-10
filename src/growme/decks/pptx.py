@@ -11,7 +11,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import MSO_AUTO_SIZE, PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 from growme.qr import generate_qr_png
@@ -115,15 +115,16 @@ def _render_section_divider(slide, s: Slide) -> None:
     else:
         _placeholder_swatch(slide, x=0, y=0, w=6.0, h=7.5)
 
-    # Right column: ghost numeral + behavior name + promise.
+    # Right column: chapter numeral, accent bar, behavior name title, promise.
+    # Numeral lives entirely above the accent bar so it never overlaps the title.
     if number:
-        _text(slide, number, x=6.4, y=0.4, w=6.6, h=4.0,
-              size=220, color=GHOST_NUM, bold=True, leading=0.95)
-    _text(slide, behavior_name, x=6.4, y=3.6, w=6.6, h=1.8,
-          size=40, color=INK, bold=True, leading=1.1)
-    _accent_bar(slide, x=6.4, y=5.3, w=1.0)
-    _text(slide, promise, x=6.4, y=5.5, w=6.6, h=1.6,
-          size=18, color=MUTED, leading=1.4)
+        _text(slide, number, x=6.4, y=0.6, w=6.6, h=1.3,
+              size=80, color=BRAND, bold=True, leading=1.0)
+    _accent_bar(slide, x=6.4, y=2.0, w=0.8)
+    _text(slide, behavior_name, x=6.4, y=2.25, w=6.6, h=2.5,
+          size=44, color=INK, bold=True, leading=1.1, body=True)
+    _text(slide, promise, x=6.4, y=4.95, w=6.6, h=2.0,
+          size=18, color=MUTED, leading=1.4, body=True)
 
 
 def _render_teach(slide, s: Slide) -> None:
@@ -135,18 +136,18 @@ def _render_teach(slide, s: Slide) -> None:
     _text(slide, eyebrow, x=0.7, y=0.7, w=12.0, h=0.4,
           size=11, color=BRAND, bold=True, uppercase=True, tracking=True)
     _text(slide, title, x=0.7, y=1.15, w=12.0, h=1.2,
-          size=34, color=INK, bold=True, leading=1.1)
+          size=34, color=INK, bold=True, leading=1.1, body=True)
     _accent_bar(slide, x=0.7, y=2.35, w=0.8)
 
     if isinstance(bullets, list) and bullets:
-        _bullet_block(slide, bullets, x=0.7, y=2.7, w=12.0, h=4.0,
+        _bullet_block(slide, bullets, x=0.7, y=2.7, w=12.0, h=3.5,
                       size=20, color=INK, leading=1.4)
     elif s.body_md:
-        _text(slide, s.body_md, x=0.7, y=2.7, w=12.0, h=4.0,
-              size=20, color=INK, leading=1.4)
+        _text(slide, s.body_md, x=0.7, y=2.7, w=12.0, h=3.5,
+              size=20, color=INK, leading=1.4, body=True)
 
     if citation:
-        _text(slide, citation, x=0.7, y=6.55, w=12.0, h=0.35,
+        _text(slide, citation, x=0.7, y=6.4, w=12.0, h=0.3,
               size=10, color=MUTED, italic=True)
 
 
@@ -157,33 +158,27 @@ def _render_example(slide, s: Slide) -> None:
     before_body = _b(s, "before_body", "")
     after_label = _b(s, "after_label", "After")
     after_body = _b(s, "after_body", "")
-    pull_quote = _b(s, "pull_quote", "")
 
     _text(slide, eyebrow, x=0.7, y=0.7, w=12.0, h=0.4,
           size=11, color=BRAND, bold=True, uppercase=True, tracking=True)
     _text(slide, title, x=0.7, y=1.15, w=12.0, h=1.2,
-          size=32, color=INK, bold=True, leading=1.1)
+          size=32, color=INK, bold=True, leading=1.1, body=True)
     _accent_bar(slide, x=0.7, y=2.35, w=0.8)
 
-    # Two columns
+    # Two columns — bodies fill the bottom band; pull_quote (if any) is routed
+    # to speaker notes by the builder, not rendered on slide.
     col_w, gap = 5.95, 0.4
     left_x, right_x = 0.7, 0.7 + col_w + gap
 
     _text(slide, before_label, x=left_x, y=2.7, w=col_w, h=0.4,
           size=11, color=MUTED, bold=True, uppercase=True, tracking=True)
-    _text(slide, before_body, x=left_x, y=3.1, w=col_w, h=2.6,
-          size=16, color=INK, leading=1.4)
+    _text(slide, before_body, x=left_x, y=3.1, w=col_w, h=3.6,
+          size=16, color=INK, leading=1.4, body=True)
 
     _text(slide, after_label, x=right_x, y=2.7, w=col_w, h=0.4,
           size=11, color=BRAND, bold=True, uppercase=True, tracking=True)
-    _text(slide, after_body, x=right_x, y=3.1, w=col_w, h=2.6,
-          size=16, color=INK, leading=1.4)
-
-    if pull_quote:
-        # Pull quote bar at bottom.
-        _hairline(slide, x=0.7, y=6.0, w=12.0)
-        _text(slide, f"“{pull_quote}”", x=0.7, y=6.1, w=12.0, h=0.7,
-              size=13, color=MUTED, italic=True)
+    _text(slide, after_body, x=right_x, y=3.1, w=col_w, h=3.6,
+          size=16, color=INK, leading=1.4, body=True)
 
 
 def _render_activity(slide, s: Slide) -> None:
@@ -196,24 +191,24 @@ def _render_activity(slide, s: Slide) -> None:
     _text(slide, eyebrow, x=0.7, y=0.7, w=12.0, h=0.4,
           size=11, color=BRAND, bold=True, uppercase=True, tracking=True)
     _text(slide, title, x=0.7, y=1.15, w=12.0, h=1.2,
-          size=32, color=INK, bold=True, leading=1.1)
+          size=32, color=INK, bold=True, leading=1.1, body=True)
     _accent_bar(slide, x=0.7, y=2.35, w=0.8)
 
     # Brand-tinted card with the prompt + sub-prompts.
     card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                                  Inches(0.7), Inches(2.7), Inches(12.0), Inches(3.7))
+                                  Inches(0.7), Inches(2.7), Inches(12.0), Inches(3.85))
     card.fill.solid()
     card.fill.fore_color.rgb = RGBColor(0xF5, 0xF7, 0xFF)
     card.line.color.rgb = RGBColor(0xDC, 0xE3, 0xFF)
 
-    _text(slide, prompt, x=1.0, y=2.95, w=11.4, h=1.4,
-          size=22, color=INK, bold=True, leading=1.3)
+    _text(slide, prompt, x=1.0, y=2.95, w=11.4, h=1.7,
+          size=20, color=INK, bold=True, leading=1.25, body=True)
     if isinstance(sub_prompts, list) and sub_prompts:
-        _bullet_block(slide, sub_prompts, x=1.0, y=4.4, w=11.4, h=1.9,
-                      size=15, color=INK, leading=1.4)
+        _bullet_block(slide, sub_prompts, x=1.0, y=4.85, w=11.4, h=1.55,
+                      size=14, color=INK, leading=1.35)
 
     if timer_hint:
-        _text(slide, timer_hint, x=0.7, y=6.55, w=12.0, h=0.35,
+        _text(slide, timer_hint, x=0.7, y=6.7, w=12.0, h=0.3,
               size=10, color=MUTED, italic=True)
 
 
@@ -240,10 +235,10 @@ def _render_poll_qr(slide, s: Slide) -> None:
     _text(slide, "Take 60 seconds", x=0.7, y=0.7, w=8.0, h=0.4,
           size=11, color=BRAND, bold=True, uppercase=True, tracking=True)
     _text(slide, title, x=0.7, y=1.15, w=8.0, h=1.4,
-          size=34, color=INK, bold=True, leading=1.1)
+          size=34, color=INK, bold=True, leading=1.1, body=True)
     _accent_bar(slide, x=0.7, y=2.6, w=0.8)
-    _text(slide, body, x=0.7, y=2.9, w=8.0, h=3.5,
-          size=18, color=INK, leading=1.4)
+    _text(slide, body, x=0.7, y=2.9, w=8.0, h=3.3,
+          size=18, color=INK, leading=1.4, body=True)
 
     if s.qr_url:
         png_bytes = generate_qr_png(s.qr_url)
@@ -258,21 +253,45 @@ def _render_poll_qr(slide, s: Slide) -> None:
 def _render_close(slide, s: Slide) -> None:
     title = _b(s, "title", s.title)
     commitment = _b(s, "commitment_recap", s.body_md)
+    alternates = _b(s, "commitment_alternates", []) or []
     next_step = _b(s, "next_step", "")
 
     _text(slide, "What's next", x=0.7, y=0.7, w=12.0, h=0.4,
           size=11, color=BRAND, bold=True, uppercase=True, tracking=True)
-    _text(slide, title, x=0.7, y=1.15, w=12.0, h=1.4,
-          size=40, color=INK, bold=True, leading=1.1)
-    _accent_bar(slide, x=0.7, y=2.7, w=0.8)
-    _text(slide, "Your commitment", x=0.7, y=3.0, w=12.0, h=0.4,
+    _text(slide, title, x=0.7, y=1.05, w=12.0, h=1.0,
+          size=38, color=INK, bold=True, leading=1.1, body=True)
+    _accent_bar(slide, x=0.7, y=2.15, w=0.8)
+
+    # Section 1: commitment recap (one tight paragraph).
+    _text(slide, "Your commitment", x=0.7, y=2.5, w=12.0, h=0.35,
           size=11, color=MUTED, bold=True, uppercase=True, tracking=True)
-    _text(slide, commitment, x=0.7, y=3.4, w=12.0, h=1.6,
-          size=20, color=INK, leading=1.35)
-    _text(slide, "Next week", x=0.7, y=5.1, w=12.0, h=0.4,
+    _text(slide, commitment, x=0.7, y=2.85, w=12.0, h=1.2,
+          size=18, color=INK, leading=1.35, body=True)
+
+    # Section 1b (Phase γ): stage-tone commitment alternates, if the planner
+    # emitted any. Skeptic / beginner / practitioner — facilitator invites the
+    # room to pick the one that fits their week.
+    if isinstance(alternates, list) and alternates:
+        _text(slide, "Or pick the one that fits your week",
+              x=0.7, y=4.15, w=12.0, h=0.35,
+              size=11, color=MUTED, bold=True, uppercase=True, tracking=True)
+        _bullet_block(slide, alternates[:3], x=0.7, y=4.5, w=12.0, h=1.05,
+                      size=14, color=INK, leading=1.3)
+        hairline_y = 5.65
+        next_y = 5.85
+    else:
+        hairline_y = 5.0
+        next_y = 5.2
+
+    # Hard horizontal rule between sections so the two beats are obvious
+    # even if either text block has been shrunk to fit.
+    _hairline(slide, x=0.7, y=hairline_y, w=12.0)
+
+    # Section 2: single concrete next-week action.
+    _text(slide, "Before next week", x=0.7, y=next_y, w=12.0, h=0.35,
           size=11, color=MUTED, bold=True, uppercase=True, tracking=True)
-    _text(slide, next_step, x=0.7, y=5.5, w=12.0, h=1.4,
-          size=20, color=INK, leading=1.35)
+    _text(slide, next_step, x=0.7, y=next_y + 0.4, w=12.0, h=1.1,
+          size=18, color=INK, leading=1.4, body=True)
 
 
 # ============================================================
@@ -289,6 +308,7 @@ def _text(
     slide, text, *, x, y, w, h,
     size=14, color=INK, bold=False, italic=False,
     leading=1.2, align="left", uppercase=False, tracking=False,
+    body=False,
 ):
     if text is None:
         return
@@ -303,6 +323,10 @@ def _text(
     tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     tf = tb.text_frame
     tf.word_wrap = True
+    if body:
+        # Long-form text shrinks to fit when the LLM emits a worst-case length,
+        # so wrapped lines never overflow into the next visual zone.
+        tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
     tf.margin_left = Emu(0)
     tf.margin_right = Emu(0)
     tf.margin_top = Emu(0)
@@ -323,6 +347,7 @@ def _bullet_block(slide, items, *, x, y, w, h, size, color, leading):
     tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     tf = tb.text_frame
     tf.word_wrap = True
+    tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
     tf.margin_left = Emu(0)
     for i, item in enumerate(items):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
@@ -360,8 +385,8 @@ def _placeholder_swatch(slide, *, x, y, w, h):
 
 
 def _add_footer(slide, deck_title: str, slide_number: int, total: int) -> None:
-    _hairline(slide, x=0.7, y=7.05, w=11.93)
-    _text(slide, deck_title, x=0.7, y=7.12, w=10.0, h=0.3,
+    _hairline(slide, x=0.7, y=7.15, w=11.93)
+    _text(slide, deck_title, x=0.7, y=7.22, w=10.0, h=0.25,
           size=9, color=MUTED)
-    _text(slide, f"{slide_number} / {total}", x=11.5, y=7.12, w=1.13, h=0.3,
+    _text(slide, f"{slide_number} / {total}", x=11.5, y=7.22, w=1.13, h=0.25,
           size=9, color=MUTED, align="right")

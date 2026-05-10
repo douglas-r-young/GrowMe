@@ -4,21 +4,57 @@
 Pre answers skew Rarely/Sometimes; post answers skew Sometimes/Often with
 non-uniform movement so the delta has narrative depth (one behavior shifts
 more than the other two).
+
+Phase β additions (per pedagogy v3 doc §3 Stages of Change):
+- Each learner gets a `stage_of_change` (skeptic / beginner / practitioner) and
+  `commitment_strength` (1-5). Distribution: 2 skeptics, 4 beginners, 2 practitioners.
+- Commitments use "When [trigger], I will [action]" form (Gollwitzer implementation
+  intentions) and are validated by `AssessmentResponse.commitment` — flat strings
+  that don't match the form will raise.
+- Stage data drives nudge-tone differentiation in `nudges/node.py`.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from growme.schemas import AssessmentResponse
 
-LEARNERS = [
-    ("learner_01", "Sam Patel"),
-    ("learner_02", "Riya Chen"),
-    ("learner_03", "Marcus Vega"),
-    ("learner_04", "Tasha Brooks"),
-    ("learner_05", "Jordan Kim"),
-    ("learner_06", "Priya Nair"),
-    ("learner_07", "Diego Souza"),
-    ("learner_08", "Lena Park"),
+
+@dataclass(frozen=True)
+class LearnerProfile:
+    learner_id: str
+    learner_name: str
+    stage_of_change: str       # "skeptic" | "beginner" | "practitioner"
+    commitment_strength: int   # 1-5; drives tone confidence in nudges
+
+
+LEARNER_PROFILES: list[LearnerProfile] = [
+    LearnerProfile("learner_01", "Sam Patel",      "beginner",      3),
+    LearnerProfile("learner_02", "Riya Chen",      "skeptic",       2),
+    LearnerProfile("learner_03", "Marcus Vega",    "beginner",      4),
+    LearnerProfile("learner_04", "Tasha Brooks",   "skeptic",       2),
+    LearnerProfile("learner_05", "Jordan Kim",     "practitioner",  5),
+    LearnerProfile("learner_06", "Priya Nair",     "beginner",      3),
+    LearnerProfile("learner_07", "Diego Souza",    "practitioner",  4),
+    LearnerProfile("learner_08", "Lena Park",      "beginner",      3),
 ]
+"""8 learners, distributed 2 skeptics / 4 beginners / 2 practitioners — the
+plausible cohort shape per pedagogy v3 doc §3 ("most rooms have a healthy
+precontemplation contingent")."""
+
+
+# Backwards-compat shape: list of (learner_id, learner_name) tuples. Existing
+# code that imported LEARNERS keeps working; new code reads LEARNER_PROFILES.
+LEARNERS: list[tuple[str, str]] = [(p.learner_id, p.learner_name) for p in LEARNER_PROFILES]
+
+
+def profile_for(learner_id: str) -> LearnerProfile:
+    """Return the LearnerProfile for `learner_id`. Raises KeyError if missing."""
+    for p in LEARNER_PROFILES:
+        if p.learner_id == learner_id:
+            return p
+    raise KeyError(f"unknown learner_id: {learner_id!r}")
+
 
 # Per-learner pre answers per behavior (b1, b2, b3 — order = wizard order).
 _PRE = [
@@ -42,15 +78,17 @@ _POST = [
     ("Often",     "Sometimes", "Sometimes"),
     ("Sometimes", "Often",     "Sometimes"),
 ]
+# Implementation-intention commitments (Gollwitzer form: "When X, I will Y").
+# Triggers are event-bound or time-bound. Validated by AssessmentResponse.commitment.
 _COMMITMENTS = [
-    "On 3 calls this week, ask 'how do you measure that today?'",
-    "Pre-write outcome statements for top 3 capabilities I pitch",
-    "Always name the competitor first in next 5 calls",
-    "Memorize 2 proof points per top competitor",
-    "On 3 calls this week, ask 'how do you measure that today?'",
-    "Pre-write outcome statements for top 3 capabilities I pitch",
-    "Always name the competitor first in next 5 calls",
-    "On 3 calls this week, ask 'how do you measure that today?'",
+    "When my next discovery call starts, I will ask 'how do you measure that today?' before any capability pitch.",
+    "When I open a new opportunity in Salesforce, I will pre-write the outcome statement before adding capabilities.",
+    "When a prospect names a competitor on my next 5 calls, I will name our differentiator before they finish framing.",
+    "When my Tuesday demo ends, I will log 2 proof points against the top competitor in the deal record.",
+    "When pipeline review starts on Monday, I will state the EB name + budget question for my top 3 deals.",
+    "When my next discovery call ends, I will write the dollar quantification of pain in the deal record.",
+    "When a prospect asks 'what makes you different?', I will lead with our unique technical proof point, not features.",
+    "When I open a new opportunity in Salesforce, I will fill in the EB and DC fields before changing stage.",
 ]
 
 

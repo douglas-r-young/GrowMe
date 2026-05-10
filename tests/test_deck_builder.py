@@ -34,14 +34,23 @@ def _enriched():
 
 
 def _plan():
+    # Pedagogy v3 doc §6 pacing: 60-min total, framework ≤30% (so 12 min cap),
+    # ≥1 buffer block ≥5 min, no framework block >12 min.
+    blocks = [
+        ("Open",     5,  "story"),
+        ("Teach",    10, "framework"),
+        ("Discuss",  12, "discussion"),
+        ("Practice", 15, "activity"),
+        ("Close",    10, "activity"),
+        ("Buffer",   8,  "buffer"),
+    ]
     return SessionPlan(
         session_number=1,
         title="Photon DB · PIC Mastery",
         behavior_id=None,
         learning_objective="Synthesize all three PIC behaviors in a deal motion.",
-        agenda=[AgendaBlock(name=n, duration_min=d, description="...")
-                for n, d in [("Open", 5), ("Teach", 15), ("Discuss", 15),
-                             ("Practice", 15), ("Close", 10)]],
+        agenda=[AgendaBlock(name=n, duration_min=d, description="...", bucket=b)
+                for n, d, b in blocks],
     )
 
 
@@ -109,3 +118,50 @@ def test_collect_image_prompts_returns_cover_plus_dividers_in_order():
     assert prompts[0] == "abstract"
     assert prompts[1] == "art 1"
     assert prompts[3] == "art 3"
+
+
+def test_example_pull_quote_appended_to_speaker_notes():
+    """Example pull_quote is a facilitator one-liner; the builder appends it to
+    speaker notes so the renderer doesn't need to fit it on the slide."""
+    ec = _enriched()
+    plan = _plan()
+
+    base_notes = "x" * 100
+    sentinel = "Six-figure drag on your analytics team every month."
+    slides = [
+        _planned("cover", {"eyebrow": "GrowMe", "title": "T", "subtitle": "lo", "image_prompt": "a"}),
+        _planned("poll_qr", {}),
+        _planned("teach", {"eyebrow": "Why", "title": "Why", "bullets": ["a", "b"], "citation": "src"}),
+    ]
+    for i, name in enumerate(["B1", "B2", "B3"], start=1):
+        slides += [
+            _planned("section_divider", {"number": f"0{i}", "behavior_name": name, "promise": "p", "image_prompt": "art"}),
+            _planned("teach", {"eyebrow": "F", "title": name, "bullets": ["a", "b"], "citation": ""}),
+            PlannedSlide(
+                layout="example",
+                blocks={"title": "E", "before_body": "before", "after_body": "after",
+                        "pull_quote": sentinel},
+                speaker_notes=base_notes,
+            ),
+            _planned("activity", {"eyebrow": "Try", "title": "A", "prompt": "p", "sub_prompts": ["x"], "timer_hint": "5"}),
+        ]
+    slides += [
+        _planned("activity", {"eyebrow": "Integration", "title": "I", "prompt": "p", "sub_prompts": ["x"], "timer_hint": "10"}),
+        _planned("poll_qr", {}),
+        _planned("close", {"title": "Thanks", "commitment_recap": "c c c c c", "next_step": "n n n n n"}),
+    ]
+    dp = DeckPlan(slides=slides)
+
+    deck = build_deck(
+        plan=plan, enriched=ec, deck_plan=dp,
+        pre_qr_url="http://x?kind=pre", post_qr_url="http://x?kind=post",
+        facilitator_guide_md="# g",
+        image_paths=[None, None, None, None],
+    )
+
+    examples = [s for s in deck.slides if s.layout == "example"]
+    assert len(examples) == 3
+    for s in examples:
+        assert sentinel in s.speaker_notes, (
+            "pull_quote should be appended to speaker notes"
+        )

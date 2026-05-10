@@ -29,7 +29,13 @@ SYNTH_SYSTEM = (
     "Given web search hits and a question, return up to 5 concrete findings. "
     "Each finding has 'text' (1-2 sentence factual statement) and 'source_url' "
     "(URL from the search hits if directly supported; empty string if inferred). "
-    "Ground claims in the hits whenever possible; do not fabricate URLs."
+    "Ground claims in the hits whenever possible; do not fabricate URLs.\n\n"
+    "When extracting OBJECTIONS, prefer findings that reveal the resistance pattern: "
+    "skill gap (\"I don't know how to do this\"), habit conflict (\"the old way is "
+    "automatic\"), incentive mismatch (\"the comp plan rewards otherwise\"), fear "
+    "(\"if I qualify hard I'll lose the deal\"), or environment (\"we don't have a "
+    "tool to track this\"). One word of resistance-pattern flavor per finding when "
+    "the source supports it."
 )
 
 

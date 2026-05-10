@@ -53,3 +53,58 @@ def test_planner_speaker_notes_min_length_enforced():
     import pytest
     with pytest.raises(Exception):
         PlannedSlide(layout="teach", blocks={}, speaker_notes="too short")
+
+
+def test_activity_prompt_rejects_overlong():
+    import pytest
+
+    from growme.decks.llm import ActivityBlocks
+
+    # 180 is the cap; 181 must fail.
+    with pytest.raises(Exception):
+        ActivityBlocks(
+            eyebrow="Try it · 5 min",
+            title="A",
+            prompt="x" * 181,
+            sub_prompts=["a"],
+            timer_hint="5 min",
+        )
+
+
+def test_activity_sub_prompt_item_rejects_overlong():
+    import pytest
+
+    from growme.decks.llm import ActivityBlocks
+
+    with pytest.raises(Exception):
+        ActivityBlocks(
+            eyebrow="Try it · 5 min",
+            title="A",
+            prompt="ok",
+            sub_prompts=["x" * 101],   # per-item cap is 100
+            timer_hint="5 min",
+        )
+
+
+def test_close_recap_and_next_step_reject_overlong():
+    import pytest
+
+    from growme.decks.llm import CloseBlocks
+
+    with pytest.raises(Exception):
+        CloseBlocks(title="Thanks", commitment_recap="x" * 181, next_step="ok")
+    with pytest.raises(Exception):
+        CloseBlocks(title="Thanks", commitment_recap="ok ok ok ok", next_step="x" * 181)
+
+
+def test_example_body_reject_overlong():
+    import pytest
+
+    from growme.decks.llm import ExampleBlocks
+
+    with pytest.raises(Exception):
+        ExampleBlocks(
+            title="E",
+            before_body="x" * 261,
+            after_body="ok ok ok ok",
+        )

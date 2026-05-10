@@ -1,19 +1,26 @@
-"""Generate a DesignDoc from EnrichedContext + WizardInputs."""
+"""Generate a DesignDoc from EnrichedContext + WizardInputs.
+
+V0 ships ONE 60-minute integration session. The DesignDoc schema collapsed on
+2026-05-09 to match (single `integration_learning_objective`, mandatory
+`transfer_plan_md`). See schemas.py:DesignDoc for the rationale.
+"""
 from __future__ import annotations
+
+import logging
 
 from growme.design_doc.prompts import DESIGN_DOC_SYSTEM, build_user_prompt
 from growme.llm_clients import complete_json
+from growme.pedagogy.checklist import count_specifics
 from growme.schemas import DesignDoc, EnrichedContext, WizardInputs
+
+_log = logging.getLogger(__name__)
 
 
 def run(enriched: EnrichedContext, inputs: WizardInputs) -> DesignDoc:
     enriched_json = enriched.model_dump_json()
-    # The design doc is generated against the *intended* 4-session curriculum
-    # even when V0 collapses delivery to 1 session (program_length_sessions=1).
     user = build_user_prompt(
         enriched_json=enriched_json,
         audience=inputs.audience_description,
-        sessions=4,
         duration_min=inputs.session_duration_min,
     )
     doc = complete_json(
@@ -23,11 +30,22 @@ def run(enriched: EnrichedContext, inputs: WizardInputs) -> DesignDoc:
         schema=DesignDoc,
         max_tokens=3000,
     )
-    if len(doc.behavior_objectives) != 3 or len(doc.learning_objectives) != 4:
-        raise ValueError(
-            f"Design doc has wrong section lengths: "
-            f"behaviors={len(doc.behavior_objectives)} (need 3), "
-            f"learning={len(doc.learning_objectives)} (need 4)"
+    # Post-hoc anti-slop check that needs the enriched context to evaluate.
+    # Pydantic context-aware validators don't run inside complete_json's retry
+    # loop (the loop calls model_validate_json without context), so we run this
+    # ourselves and warn rather than fail — the retry pressure already pushed
+    # the model toward compliance via the prompt.
+    specifics = (
+        list(enriched.base.vertical_vocab)
+        + [c.text for c in enriched.base.named_competitors]
+        + [c.text for c in enriched.base.customer_voice]
+    )
+    n_specifics = count_specifics(doc.full_markdown, specifics)
+    if n_specifics < 3:
+        _log.warning(
+            "design_doc.full_markdown references only %d/%d possible research specifics; "
+            "anti-slop target is ≥3. Doc will ship but consider regenerating.",
+            n_specifics, len(specifics),
         )
     return doc
 

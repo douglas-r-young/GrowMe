@@ -1,12 +1,16 @@
 """Generate ONE SessionPlan covering all three selected behaviors.
 
-V0 demo simplification: the program collapses to a single ~60-min session that
-follows the integration-session pattern from the original spec — multi-behavior
-scenario, switching between behaviors in the role-play, cross-cutting commitment.
+V0 ships a single ~60-min integration session — multi-behavior scenario, switching
+between behaviors in the role-play, cross-cutting commitment.
+
+The SESSION_PLAN_SYSTEM concatenates SESSION_PLAN_PRINCIPLES from the pedagogy
+package — that bundle carries pacing rules, block floors, bucket ratios,
+human-handoff markers.
 """
 from __future__ import annotations
 
 from growme.llm_clients import complete_json
+from growme.pedagogy import SESSION_PLAN_PRINCIPLES
 from growme.schemas import (
     AgendaBlock,
     BehaviorContext,
@@ -15,7 +19,7 @@ from growme.schemas import (
     WizardInputs,
 )
 
-SESSION_PLAN_SYSTEM = """\
+SESSION_PLAN_SYSTEM = f"""\
 You are an instructional designer. Generate ONE SessionPlan (~60 min) that
 covers all three behaviors in a single integration session.
 
@@ -23,16 +27,24 @@ The session has:
   session_number: 1
   title: short, demo-readable (mentions all three behaviors implicitly)
   behavior_id: null  (this is the integration session, not behavior-specific)
-  learning_objective: "After this session the learner will be able to <verb>..."
+  learning_objective: "After this session the learner will be able to <verb> when <trigger>..."
     The verb should reflect synthesizing across all three behaviors.
-  agenda: a list of AgendaBlocks summing to ~60 minutes:
-    Opening hook (5)  | Teach (15)  | Discuss (15)  | Practice/role-play (15)  | Commitment + close (10)
-  Each AgendaBlock has: name, duration_min, description (1-2 sentences).
+  agenda: a list of AgendaBlocks. Each AgendaBlock has:
+    - name: short label
+    - duration_min: int
+    - description: 1-2 sentences. Tag the bucket in the description like
+      "[bucket: framework]" or "[bucket: storytelling]" — the renderer parses this
+      and the structural validator enforces ratios.
+    - bucket: one of "framework", "story", "activity", "discussion", "buffer".
+  Total agenda minutes ∈ [55, 65]. At least one block has bucket="buffer" with
+  duration_min ≥ 5.
 
 Ground the role-play in a multi-behavior scenario sourced from the per-behavior
 findings — set up uses .examples, tension uses .objections, recovery uses
-.proof_points. The opening hook should anchor on the connection between the
-three behaviors.
+.proof_points. The opening hook anchors on the connection between the three
+behaviors.
+
+{SESSION_PLAN_PRINCIPLES}
 
 Output strict JSON: a single SessionPlan object.
 """

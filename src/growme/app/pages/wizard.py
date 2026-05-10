@@ -38,13 +38,27 @@ def render():
         _step_build()
 
 
+_AUDIENCE_PLACEHOLDER = (
+    "12 mid-market AEs, 1-3 yrs tenure. They run discovery calls but don't quantify "
+    "pain in business-impact terms. The comp plan rewards velocity over qualification; "
+    "reps know they should ask 'how do you measure that?' but default to capability "
+    "pitch under quota pressure. Expanding into healthcare verticals where buyers "
+    "expect ROI math up front."
+)
+
+_AUDIENCE_HELP = (
+    "Be specific. The pedagogy doc demands behavior altitude (what would they do "
+    "differently next Tuesday?) AND the resistance pattern (skill gap, habit, "
+    "incentive mismatch, fear, or environment). Vague inputs = generic output. "
+    "If you're not sure about the resistance pattern, write what's getting in "
+    "the way today and the agent will infer."
+)
+
+
 def _step_company_audience():
     saved_url = state.get("company_url", "neon.tech")
     saved_alias = state.get("company_alias", "Photon DB")
-    saved_audience = state.get(
-        "audience_description",
-        "12 mid-market AEs, 1-3 yrs tenure, expanding into healthcare",
-    )
+    saved_audience = state.get("audience_description", _AUDIENCE_PLACEHOLDER)
 
     st.subheader("Step 1 — Company + Audience")
     company_url = st.text_input(
@@ -58,10 +72,11 @@ def _step_company_audience():
         help="The output will use this name. Real name gets find/replace before display.",
     )
     audience_description = st.text_area(
-        "Audience description",
+        "Audience description (be specific — what behavior, what role, what's currently in the way?)",
         value=saved_audience,
-        height=120,
-        help="Short paragraph describing the cohort.",
+        height=180,
+        placeholder=_AUDIENCE_PLACEHOLDER,
+        help=_AUDIENCE_HELP,
     )
 
     if st.button("Next →", type="primary"):
@@ -152,7 +167,12 @@ def _step_build():
     from growme.assessment.generator import generate_program_assessment
     from growme.decks.builder import build_deck, collect_image_prompts
     from growme.decks.images import generate_deck_images
-    from growme.decks.llm import gen_facilitator_guide, plan_deck
+    from growme.decks.llm import (
+        gen_facilitator_guide,
+        gen_manager_briefing,
+        plan_deck_audited,
+    )
+    from growme.pedagogy.auditor import render_audit_summary_md
     from growme.decks.pptx import export_pptx
     from growme.decks.render import render_deck
     from growme.sessions.plan_node import run as run_plan
@@ -190,12 +210,27 @@ def _step_build():
                         from growme.assessment.generator import generate_program_assessment_offline
                         assessment = generate_program_assessment_offline(inputs.selected_behavior_ids)
                     state.update("program_assessment", assessment)
-                    s.write("Planning deck (gpt-5.1, ~30s)...")
-                    deck_plan = plan_deck(plan, enriched)
+                    s.write("Planning deck (gpt-5.1, ~30s) + anti-slop audit pass...")
+                    deck_plan, audit_report = plan_deck_audited(plan, enriched)
+                    if audit_report is not None and audit_report.overall_grade != "pass":
+                        state.update("deck_audit_report", audit_report)
+                    else:
+                        state.update("deck_audit_report", None)
                     s.write(f"Generating {len(collect_image_prompts(deck_plan))} hero images...")
                     image_paths = generate_deck_images(collect_image_prompts(deck_plan))
                     s.write("Facilitator guide...")
                     guide_md = gen_facilitator_guide(plan, enriched, deck_plan=deck_plan)
+                    s.write("Manager 1:1 briefing (6-week prompt sheet)...")
+                    try:
+                        manager_briefing_md = gen_manager_briefing(
+                            plan=plan,
+                            enriched=enriched,
+                            deck_plan=deck_plan,
+                            design_doc_md=edited_md,
+                        )
+                    except Exception as e:
+                        st.warning(f"Manager briefing generation failed ({e}); shipping without it.")
+                        manager_briefing_md = ""
                     s.write("Composing deck + exporting .pptx...")
                     base_url = os.environ.get("STREAMLIT_LOCAL_URL", "http://localhost:8501")
                     pre_qr_url = f"{base_url}/?assessment={session_uuid}&kind=pre"
@@ -204,6 +239,7 @@ def _step_build():
                         plan=plan, enriched=enriched, deck_plan=deck_plan,
                         pre_qr_url=pre_qr_url, post_qr_url=post_qr_url,
                         facilitator_guide_md=guide_md,
+                        manager_briefing_md=manager_briefing_md,
                         image_paths=image_paths,
                         company_alias=inputs.company_alias,
                     )
@@ -223,6 +259,10 @@ def _step_build():
 
     st.success("✅ Built!")
 
+    audit_report = state.get("deck_audit_report")
+    if audit_report is not None:
+        st.warning(render_audit_summary_md(audit_report))
+
     col_actions, col_qr = st.columns([2, 1])
     with col_actions:
         if deck.pptx_path:
@@ -239,6 +279,16 @@ def _step_build():
             file_name="facilitator_guide.md",
             mime="text/markdown",
         )
+        if deck.manager_briefing_md:
+            st.download_button(
+                "⬇ Download manager 1:1 prompts (.md)",
+                data=deck.manager_briefing_md,
+                file_name="manager_1to1_prompts.md",
+                mime="text/markdown",
+                help="6-week 1:1 prompt sheet for the rep's manager. "
+                     "Manager involvement is the single largest predictor of "
+                     "training transfer.",
+            )
         st.caption("▶ Switch to **Demo Console** in the sidebar to run the simulation.")
     with col_qr:
         from growme.qr import generate_qr_png
