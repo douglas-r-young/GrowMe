@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { ClipboardCheck, Download, Loader2, PenLine, PlayCircle, RefreshCcw, Target } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ClipboardCheck,
+  Download,
+  Loader2,
+  PenLine,
+  PlayCircle,
+  RefreshCcw,
+  Save,
+  Target
+} from "lucide-react";
 
 import { api, waitForJob } from "../api";
 import { JobProgress, MarkdownLite, PanelTitle } from "./shared";
@@ -23,17 +34,28 @@ export function DesignApproval({
   );
   const [job, setJob] = useState<JobStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
 
   async function runDesign() {
     setBusy(true);
-    const created = await api.createDesignJob(sessionId);
-    const finalJob = await waitForJob(created.job_id, setJob);
-    if (finalJob.status === "complete") {
-      const next = await api.session(sessionId);
-      setMarkdown(next.design_doc_edited_md ?? "");
-      onSnapshot(next);
+    setJob(null);
+    try {
+      const created = await api.createDesignJob(sessionId);
+      const finalJob = await waitForJob(created.job_id, setJob);
+      if (finalJob.status === "complete") {
+        const next = await api.session(sessionId);
+        setMarkdown(next.design_doc_edited_md ?? next.design_doc?.full_markdown ?? "");
+        onSnapshot(next);
+      }
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
+  }
+
+  async function saveMarkdown() {
+    const next = await api.saveDesignDoc(sessionId, markdown);
+    onSnapshot(next);
   }
 
   if (!snapshot.design_doc) {
@@ -73,25 +95,67 @@ export function DesignApproval({
           ))}
         </div>
       </section>
-      <section className="panel">
-        <PanelTitle icon={<RefreshCcw size={18} />} title="Transfer Plan" />
-        <MarkdownLite text={snapshot.design_doc.transfer_plan_md} />
+      <section className="panel compact-panel">
+        <div className="section-header">
+          <PanelTitle icon={<RefreshCcw size={18} />} title="Transfer Plan" />
+          <button
+            className="button subtle compact-button"
+            onClick={() => setIsTransferOpen((open) => !open)}
+            aria-expanded={isTransferOpen}
+            aria-controls="transfer-plan-body"
+            aria-label={isTransferOpen ? "Collapse transfer plan" : "View full plan"}
+          >
+            {isTransferOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {isTransferOpen ? "Collapse" : "View full plan"}
+          </button>
+        </div>
+        {isTransferOpen ? (
+          <div id="transfer-plan-body">
+            <MarkdownLite text={snapshot.design_doc.transfer_plan_md} />
+          </div>
+        ) : (
+          <p className="compact-preview">{transferPreview(snapshot.design_doc.transfer_plan_md)}</p>
+        )}
       </section>
-      <section className="panel">
-        <PanelTitle icon={<PenLine size={18} />} title="Editable Design Markdown" />
-        <textarea value={markdown} onChange={(event) => setMarkdown(event.target.value)} rows={12} />
+      <section className="panel compact-panel">
+        <div className="section-header">
+          <PanelTitle icon={<PenLine size={18} />} title="Editable Design Markdown" />
+          <button
+            className="button subtle compact-button"
+            onClick={() => setIsEditorOpen((open) => !open)}
+            aria-expanded={isEditorOpen}
+            aria-controls="design-markdown-editor"
+            aria-label={isEditorOpen ? "Close design markdown" : "Edit design markdown"}
+          >
+            {isEditorOpen ? <ChevronUp size={16} /> : <PenLine size={16} />}
+            {isEditorOpen ? "Close" : "Edit"}
+          </button>
+        </div>
+        {isEditorOpen ? (
+          <div className="editor-stack">
+            <textarea
+              id="design-markdown-editor"
+              aria-label="Editable design markdown"
+              value={markdown}
+              onChange={(event) => setMarkdown(event.target.value)}
+              rows={12}
+            />
+            <JobProgress job={job} />
+            <div className="inline-actions">
+              <button className="button subtle" onClick={saveMarkdown}>
+                <Save size={17} />
+                Save edits
+              </button>
+              <button className="button subtle" onClick={runDesign} disabled={busy}>
+                {busy ? <Loader2 className="spin" size={17} /> : <RefreshCcw size={17} />}
+                Re-run design
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
       <div className="footer-actions">
         <button className="button subtle" onClick={onBack}>Back</button>
-        <button
-          className="button subtle"
-          onClick={async () => {
-            const next = await api.saveDesignDoc(sessionId, markdown);
-            onSnapshot(next);
-          }}
-        >
-          Save edits
-        </button>
         <button className="button primary" onClick={onContinue}>
           <Download size={17} />
           Continue to Program Materials
@@ -99,4 +163,8 @@ export function DesignApproval({
       </div>
     </>
   );
+}
+
+function transferPreview(markdown: string): string {
+  return markdown.split("\n").map((line) => line.trim()).find(Boolean) ?? "Transfer plan ready.";
 }

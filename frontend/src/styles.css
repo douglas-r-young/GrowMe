@@ -180,6 +180,49 @@ main {
   font-size: 1.25rem;
 }
 
+.section-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.section-header .panel-title {
+  margin-bottom: 0;
+}
+
+.compact-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.compact-button {
+  min-height: 36px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.compact-preview {
+  background: #f4ede4;
+  border-radius: 8px;
+  color: var(--muted);
+  margin: 0;
+  padding: 14px;
+}
+
+.editor-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.inline-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
 label {
   color: var(--ink);
   display: grid;
@@ -542,5 +585,14 @@ legend {
   .asset-row,
   .roster-row {
     grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .compact-button {
+    width: 100%;
   }
 }
