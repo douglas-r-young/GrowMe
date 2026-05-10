@@ -11,6 +11,7 @@ import os  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from growme.app import state  # noqa: E402
+from growme.app.ui.styles import inject_global_css  # noqa: E402
 
 st.set_page_config(page_title="GrowMe", page_icon="🌱", layout="wide")
 
@@ -29,9 +30,12 @@ def main():
     if isinstance(kind, list):
         kind = kind[0] if kind else None
     if target:
+        inject_global_css()
         from growme.app.pages import assessment
         assessment.render(target_uuid=target, kind=kind or "pre")
         return
+
+    inject_global_css()
 
     st.sidebar.title("GrowMe 🌱")
     page = st.sidebar.radio("Navigate", list(PAGES.keys()))

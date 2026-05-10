@@ -1,4 +1,11 @@
-"""Pickle-backed session state. One UUID per Streamlit session."""
+"""Pickle-backed session state. One UUID per Streamlit session.
+
+Common pickle keys include: company_url, company_alias, audience_description,
+program_name, training_track, audience_preset, audience_cohort,
+audience_program_fmt, audience_notes, reference_urls, uploaded_file_names,
+design_doc, deck, etc. ``reset_session`` removes the pickle file and clears
+Streamlit session_state (except session_uuid).
+"""
 from __future__ import annotations
 
 import os
